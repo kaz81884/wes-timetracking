@@ -1,0 +1,122 @@
+{
+  "employees": [
+    {
+      "id": "pdqy9qw3kok6",
+      "name": "WES_ADMIN",
+      "pin": "1821",
+      "role": "admin"
+    },
+    {
+      "id": "z168zcivnk4p",
+      "name": "KAREN",
+      "pin": "8665",
+      "role": "employee"
+    }
+  ],
+  "clients": [
+    {
+      "id": "ru3pm6oklzhj",
+      "name": "COMPANY A",
+      "type": "client"
+    }
+  ],
+  "projects": [
+    {
+      "id": "oszq8i3xmffb",
+      "name": "JOE SMITH",
+      "clientId": "ru3pm6oklzhj",
+      "status": "active",
+      "budget": null,
+      "color": "#7C9885",
+      "taskIds": [
+        "y1nbczf4kok6",
+        "34unagr9kok6",
+        "3i8mpaxlkok6",
+        "s6vzqqpokok6",
+        "b8xd4zp9kok6"
+      ]
+    }
+  ],
+  "taskTypes": [
+    {
+      "id": "y1nbczf4kok6",
+      "name": "Manage Inbox"
+    },
+    {
+      "id": "34unagr9kok6",
+      "name": "Calendar Management"
+    },
+    {
+      "id": "3i8mpaxlkok6",
+      "name": "Research"
+    },
+    {
+      "id": "s6vzqqpokok6",
+      "name": "Client Call"
+    },
+    {
+      "id": "b8xd4zp9kok6",
+      "name": "Admin & Ops"
+    }
+  ],
+  "engagements": [
+    {
+      "id": "3u1fuqyes9a3",
+      "clientId": "ru3pm6oklzhj",
+      "name": "XYZ - Aug 2026",
+      "status": "active",
+      "budget": null,
+      "createdAt": 1787253830139,
+      "archivedAt": null
+    },
+    {
+      "id": "0sjywfw8xbzk",
+      "clientId": "ru3pm6oklzhj",
+      "name": "123 - Money 2026",
+      "status": "active",
+      "budget": null,
+      "createdAt": 1787254066928,
+      "archivedAt": null
+    }
+  ],
+  "timeEntries": [
+    {
+      "id": "nfam5qmqp09n",
+      "employeeId": "z168zcivnk4p",
+      "projectId": "oszq8i3xmffb",
+      "taskId": "3i8mpaxlkok6",
+      "engagementId": null,
+      "notes": "",
+      "hours": 0.01,
+      "date": "2026-08-20",
+      "billable": true,
+      "mode": "duration"
+    },
+    {
+      "id": "ipwzkkffy92p",
+      "employeeId": "z168zcivnk4p",
+      "projectId": "oszq8i3xmffb",
+      "taskId": "y1nbczf4kok6",
+      "engagementId": "3u1fuqyes9a3",
+      "notes": "",
+      "hours": 0.01,
+      "date": "2026-08-20",
+      "billable": true,
+      "mode": "duration"
+    },
+    {
+      "id": "okc5thi5z78j",
+      "employeeId": "z168zcivnk4p",
+      "projectId": "oszq8i3xmffb",
+      "taskId": "s6vzqqpokok6",
+      "engagementId": "0sjywfw8xbzk",
+      "notes": "",
+      "hours": 0.01,
+      "date": "2026-08-20",
+      "billable": true,
+      "mode": "duration"
+    }
+  ],
+  "timers": {},
+  "timesheets": {}
+}

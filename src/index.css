@@ -1,0 +1,34 @@
+:root {
+  --wash: #F1EFEA;
+  --line: #E4E0D8;
+  --ink-1: #23271F;
+  --ink-2: #565A4E;
+  --ink-3: #8A8D80;
+  --accent: #7C9885;
+  --display: 'Newsreader', serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #FAF8F4;
+  font-family: 'Inter', sans-serif;
+  color: var(--ink-1);
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  opacity: 1;
+}
