@@ -43,25 +43,60 @@ The first person to open the app creates the admin account (name + 4-digit
 PIN). From there, an admin adds companies, contacts, activities, and the
 rest of the team from inside the app.
 
+## Deploying to Netlify
+
+The project is set up to run entirely on Netlify — `netlify.toml` at the repo
+root tells Netlify to build the frontend with `npm run build` (output in
+`dist/`) and to run `netlify/functions/data.mjs` as the API, backed by
+**Netlify Blobs** for storage instead of a JSON file on disk (a file
+wouldn't survive between serverless invocations the way it does on a
+long-running server).
+
+To deploy:
+
+1. Push this repo to GitHub (or GitLab/Bitbucket).
+2. In Netlify, "Add new site" → "Import an existing project" → pick the repo.
+   Netlify reads `netlify.toml` automatically, so the build command,
+   publish directory, and functions directory are already set — no manual
+   dashboard configuration needed.
+3. Deploy. Netlify Blobs is available on every site automatically; there's
+   no separate service to sign up for or API key to configure.
+4. Open the deployed site and create the first (admin) account, same as
+   local dev.
+
+If you see errors creating the first account, it almost always means the
+frontend is trying to reach an API that isn't there — double check the
+site actually deployed the function (Netlify's dashboard → Functions tab
+should list `data`) and that `netlify.toml` made it into the repo.
+
+`server/index.js` (Express + JSON file) is still there and still what
+`npm run dev` uses for **local development** — it's simpler to run locally
+than spinning up Netlify's dev environment for every change. The two
+backends are separate implementations of the same tiny `GET`/`PUT
+/api/data` contract, so the frontend code doesn't need to know or care
+which one it's talking to.
+
 ## How data is stored right now
 
-`server/index.js` keeps everything — employees, companies, contacts, the
-activity pool, time entries, timesheets — in one `server/data.json` file on
-disk, read and overwritten as a whole on every save. That's intentionally
-simple to get you running today. It's also the main thing to change before
-this handles a growing team long-term:
+Locally (`npm run dev`), `server/index.js` keeps everything — employees,
+companies, contacts, the activity pool, time entries, timesheets — in one
+`server/data.json` file on disk, read and overwritten as a whole on every
+save. On Netlify, the same shape is stored as one blob via Netlify Blobs
+instead. Both are intentionally simple to get you running today. The main
+thing to revisit as the team and data grow:
 
 - **Multiple people saving near-simultaneously** can clobber each other's
-  changes, since each save overwrites the whole file.
+  changes, since each save overwrites the whole record.
 - **No real database** means no easy querying, indexing, or backups beyond
-  copying the JSON file.
+  copying the file (locally) or exporting the blob (on Netlify).
 
-The straightforward next step is swapping `server/index.js`'s file
-read/write for a real datastore — SQLite (via `better-sqlite3`) is a solid
-first upgrade with almost no infra to manage, or Postgres (e.g. via
-[Supabase](https://supabase.com) or [Neon](https://neon.tech)) if you want
-it hosted. The `GET /api/data` / `PUT /api/data` shape can stay the same
-for a while; only `server/index.js` needs to change, not the frontend.
+The straightforward next step for either environment is swapping the
+whole-blob read/write for a real datastore — SQLite (via
+`better-sqlite3`) locally, or Postgres (e.g. via [Supabase](https://supabase.com)
+or [Neon](https://neon.tech)) if you want it hosted and shared between
+environments. The `GET /api/data` / `PUT /api/data` shape can stay the same
+for a while; only `server/index.js` and `netlify/functions/data.mjs` need
+to change, not the frontend.
 
 ## Auth
 
@@ -84,11 +119,12 @@ which is enough to deploy to something like Render, Railway, or Fly.io, or
 a small VPS behind a reverse proxy. Point `PORT` at whatever the platform
 expects (`PORT=... npm start`).
 
-If you'd rather host the frontend separately (e.g. Netlify, same as the
-[[williams-executive-support-site]] setup), build the frontend as a static
-site there and run `server/index.js` somewhere reachable, then update
-`vite.config.js`'s proxy (dev only) and point the frontend's fetch calls in
-`src/lib/data.js` at the API's real URL in production.
+If you'd rather not deploy the whole thing to Netlify, `dist/` is a plain
+static build that can be hosted anywhere (e.g. the same setup as the
+[[williams-executive-support-site]]), as long as `server/index.js` (or an
+equivalent API) is reachable somewhere and `src/lib/data.js`'s fetch calls
+point at it — see `vite.config.js`'s dev proxy for how that wiring works
+locally.
 
 ## Known limitations to revisit
 
