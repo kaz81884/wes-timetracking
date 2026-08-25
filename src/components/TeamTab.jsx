@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, KeyRound } from "lucide-react";
 import { Card, Select, TextInput, Button, IconBtn } from "./ui";
 import { uid } from "../lib/utils";
 
@@ -7,6 +7,8 @@ export default function TeamTab({ data, setData, currentUser }) {
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [role, setRole] = useState("employee");
+  const [resettingId, setResettingId] = useState(null);
+  const [resetPin, setResetPin] = useState("");
 
   const addEmployee = () => {
     const n = name.trim();
@@ -16,6 +18,14 @@ export default function TeamTab({ data, setData, currentUser }) {
   };
   const removeEmployee = (id) => { if (id === currentUser.id) return; setData({ ...data, employees: data.employees.filter((e) => e.id !== id) }); };
   const setRoleFor = (id, r) => setData({ ...data, employees: data.employees.map((e) => e.id === id ? { ...e, role: r } : e) });
+
+  const startReset = (id) => { setResettingId(id); setResetPin(""); };
+  const cancelReset = () => { setResettingId(null); setResetPin(""); };
+  const confirmReset = (id) => {
+    if (resetPin.length < 4) return;
+    setData({ ...data, employees: data.employees.map((e) => e.id === id ? { ...e, pin: resetPin } : e) });
+    setResettingId(null); setResetPin("");
+  };
 
   return (
     <Card style={{ maxWidth: 520 }}>
@@ -33,18 +43,33 @@ export default function TeamTab({ data, setData, currentUser }) {
       </div>
       <div style={{ display: "grid", gap: 6 }}>
         {data.employees.map((e) => (
-          <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, background: "var(--wash)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-              <span style={{ width: 22, height: 22, borderRadius: 99, background: "var(--accent)", color: "#fff", fontSize: 10.5, display: "flex", alignItems: "center", justifyContent: "center" }}>{e.name.slice(0, 1).toUpperCase()}</span>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-1)" }}>{e.name}{e.id === currentUser.id ? " (you)" : ""}</span>
+          <div key={e.id} style={{ padding: "8px 10px", borderRadius: 8, background: "var(--wash)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ width: 22, height: 22, borderRadius: 99, background: "var(--accent)", color: "#fff", fontSize: 10.5, display: "flex", alignItems: "center", justifyContent: "center" }}>{e.name.slice(0, 1).toUpperCase()}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-1)" }}>{e.name}{e.id === currentUser.id ? " (you)" : ""}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Select value={e.role} onChange={(ev) => setRoleFor(e.id, ev.target.value)} disabled={e.id === currentUser.id} style={{ width: 110 }}>
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                </Select>
+                <IconBtn title="Reset PIN" onClick={() => (resettingId === e.id ? cancelReset() : startReset(e.id))}><KeyRound size={14} /></IconBtn>
+                {e.id !== currentUser.id && <IconBtn danger title="Remove" onClick={() => removeEmployee(e.id)}><Trash2 size={14} /></IconBtn>}
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Select value={e.role} onChange={(ev) => setRoleFor(e.id, ev.target.value)} disabled={e.id === currentUser.id} style={{ width: 110 }}>
-                <option value="employee">Employee</option>
-                <option value="admin">Admin</option>
-              </Select>
-              {e.id !== currentUser.id && <IconBtn danger title="Remove" onClick={() => removeEmployee(e.id)}><Trash2 size={14} /></IconBtn>}
-            </div>
+            {resettingId === e.id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                <TextInput
+                  autoFocus type="password" inputMode="numeric" maxLength={4} placeholder="New 4-digit PIN"
+                  value={resetPin} onChange={(ev) => setResetPin(ev.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onKeyDown={(ev) => ev.key === "Enter" && confirmReset(e.id)}
+                  style={{ maxWidth: 160 }}
+                />
+                <Button onClick={() => confirmReset(e.id)} disabled={resetPin.length < 4} style={{ justifyContent: "center" }}>Set PIN</Button>
+                <Button variant="ghost" onClick={cancelReset} style={{ justifyContent: "center" }}>Cancel</Button>
+              </div>
+            )}
           </div>
         ))}
       </div>
