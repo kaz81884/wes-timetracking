@@ -39,6 +39,12 @@ This starts the Vite dev server on **http://localhost:5173** and the API on
 **http://localhost:5175** together (Vite proxies `/api/*` to the API — see
 `vite.config.js`). Open `localhost:5173` and you're in.
 
+To test "Forgot your PIN?" locally, copy `.env.example` to `.env` and set
+`RESEND_API_KEY` (see [Deploying to Netlify](#deploying-to-netlify) below
+for how to get one). Without it, `server/index.js` still generates and
+stores the reset link — it just logs it to the terminal instead of emailing
+it, which is enough to test the flow without a real Resend account.
+
 The first person to open the app creates the admin account (name + 4-digit
 PIN). From there, an admin adds companies, contacts, activities, and the
 rest of the team from inside the app.
@@ -61,7 +67,16 @@ To deploy:
    dashboard configuration needed.
 3. Deploy. Netlify Blobs is available on every site automatically; there's
    no separate service to sign up for or API key to configure.
-4. Open the deployed site and create the first (admin) account, same as
+4. To enable "Forgot your PIN?" emails, sign up at
+   [resend.com](https://resend.com) (free tier is enough), grab an API key,
+   and set it in Netlify → Site configuration → Environment variables as
+   `RESEND_API_KEY`. Without it, reset requests still work end-to-end but
+   the email is skipped — the link is only logged to the function's logs,
+   so it's really only usable that way for testing. Optionally also set
+   `RESEND_FROM` once you've verified your own sending domain in Resend
+   (until then, Resend's shared sandbox sender can only deliver to the
+   email address on your own Resend account, not your whole team).
+5. Open the deployed site and create the first (admin) account, same as
    local dev.
 
 If you see errors creating the first account, it almost always means the

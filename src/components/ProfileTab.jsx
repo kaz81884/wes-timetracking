@@ -4,6 +4,7 @@ import { Card, TextInput, Button } from "./ui";
 
 export default function ProfileTab({ data, setData, currentUser }) {
   const [name, setName] = useState(currentUser.name);
+  const [email, setEmail] = useState(currentUser.email || "");
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -15,6 +16,13 @@ export default function ProfileTab({ data, setData, currentUser }) {
     if (!n) return;
     setData({ ...data, employees: data.employees.map((e) => e.id === currentUser.id ? { ...e, name: n } : e) });
     setSuccess("Name updated.");
+    setError("");
+  };
+
+  const saveEmail = () => {
+    const em = email.trim();
+    setData({ ...data, employees: data.employees.map((e) => e.id === currentUser.id ? { ...e, email: em } : e) });
+    setSuccess("Email updated.");
     setError("");
   };
 
@@ -57,9 +65,13 @@ export default function ProfileTab({ data, setData, currentUser }) {
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <TextInput placeholder="Display name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} />
           <Button variant="ghost" onClick={saveName} disabled={!name.trim() || name.trim() === currentUser.name}><Check size={14} /> Save</Button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <TextInput type="email" placeholder="Email (for PIN resets)" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveEmail()} />
+          <Button variant="ghost" onClick={saveEmail} disabled={email.trim() === (currentUser.email || "")}><Check size={14} /> Save</Button>
         </div>
       </Card>
 

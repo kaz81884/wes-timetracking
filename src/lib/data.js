@@ -9,6 +9,7 @@ export const DEFAULT_DATA = {
   timeEntries: [],
   timers: {},
   timesheets: {},
+  passwordResets: {},
 };
 
 // Migrates data saved by an older version of the app: per-project `tasks`
@@ -54,6 +55,19 @@ export function migrateData(raw) {
 async function fetchData() {
   const res = await fetch("/api/data");
   if (!res.ok) throw new Error(`GET /api/data failed: ${res.status}`);
+  return res.json();
+}
+
+// Fire-and-forget from the frontend's point of view: the backend always
+// responds ok (whether or not the email matched an account) so this can't
+// be used to enumerate who has an account.
+export async function requestPinReset(email) {
+  const res = await fetch("/api/request-reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, origin: window.location.origin }),
+  });
+  if (!res.ok) throw new Error(`POST /api/request-reset failed: ${res.status}`);
   return res.json();
 }
 

@@ -9,6 +9,7 @@ const DEFAULT_DATA = {
   timeEntries: [],
   timers: {},
   timesheets: {},
+  passwordResets: {},
 };
 
 // Netlify's equivalent of server/index.js's GET/PUT /api/data, but backed by

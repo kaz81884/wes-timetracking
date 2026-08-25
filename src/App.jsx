@@ -3,6 +3,7 @@ import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield
 import { useAppData } from "./lib/data";
 import { uid, DEFAULT_TASK_TYPES } from "./lib/utils";
 import LoginScreen from "./components/LoginScreen";
+import ResetPinScreen from "./components/ResetPinScreen";
 import DashboardTab from "./components/DashboardTab";
 import LogTimeTab from "./components/LogTimeTab";
 import TimesheetTab from "./components/TimesheetTab";
@@ -15,9 +16,25 @@ export default function App() {
   const { data, setData, loading, saving, error } = useAppData();
   const [userId, setUserId] = useState(null);
   const [tab, setTab] = useState("dashboard");
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get("reset"));
 
   if (loading || !data) {
     return <div style={{ padding: 60, textAlign: "center", color: "#9AA5B1" }}>Loading…</div>;
+  }
+
+  if (resetToken) {
+    return (
+      <ResetPinScreen
+        data={data}
+        setData={setData}
+        token={resetToken}
+        onDone={(employeeId) => {
+          window.history.replaceState(null, "", window.location.pathname);
+          setResetToken(null);
+          if (employeeId) setUserId(employeeId);
+        }}
+      />
+    );
   }
 
   const currentUser = data.employees.find((e) => e.id === userId);
@@ -28,8 +45,8 @@ export default function App() {
       <LoginScreen
         employees={data.employees}
         onLogin={setUserId}
-        onBootstrapAdmin={(name, pin) => {
-          const emp = { id: uid(), name, pin, role: "admin" };
+        onBootstrapAdmin={(name, pin, email) => {
+          const emp = { id: uid(), name, pin, email, role: "admin" };
           const taskTypes = data.taskTypes.length ? data.taskTypes : DEFAULT_TASK_TYPES.map((n) => ({ id: uid(), name: n }));
           setData({ ...data, employees: [emp], taskTypes });
           setUserId(emp.id);

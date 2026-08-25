@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Clock, Shield, Lock } from "lucide-react";
+import { Clock, Shield, Lock, Mail, Check } from "lucide-react";
 import { TextInput, Button } from "./ui";
+import { requestPinReset } from "../lib/data";
 
 export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
   const [picked, setPicked] = useState(null);
@@ -8,10 +9,29 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
   const [err, setErr] = useState("");
   const [bootName, setBootName] = useState("");
   const [bootPin, setBootPin] = useState("");
+  const [bootEmail, setBootEmail] = useState("");
+
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotBusy, setForgotBusy] = useState(false);
 
   const tryLogin = () => {
     if (pin === picked.pin) onLogin(picked.id);
     else setErr("That PIN doesn't match.");
+  };
+
+  const submitForgot = async () => {
+    if (!forgotEmail.trim() || forgotBusy) return;
+    setForgotBusy(true);
+    try {
+      await requestPinReset(forgotEmail.trim());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setForgotBusy(false);
+      setForgotSent(true);
+    }
   };
 
   return (
@@ -30,11 +50,32 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
             </p>
             <div style={{ display: "grid", gap: 8 }}>
               <TextInput placeholder="Your name" value={bootName} onChange={(e) => setBootName(e.target.value)} />
+              <TextInput type="email" placeholder="Your email (for PIN resets)" value={bootEmail} onChange={(e) => setBootEmail(e.target.value)} />
               <TextInput placeholder="Choose a 4-digit PIN" inputMode="numeric" maxLength={4} value={bootPin} onChange={(e) => setBootPin(e.target.value.replace(/\D/g, "").slice(0, 4))} />
-              <Button disabled={!bootName.trim() || bootPin.length < 4} onClick={() => onBootstrapAdmin(bootName.trim(), bootPin)}>
+              <Button disabled={!bootName.trim() || bootPin.length < 4} onClick={() => onBootstrapAdmin(bootName.trim(), bootPin, bootEmail.trim())}>
                 <Shield size={14} /> Create admin account
               </Button>
             </div>
+          </div>
+        ) : forgotMode ? (
+          <div style={{ textAlign: "left" }}>
+            <button onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail(""); }} style={{ background: "none", border: "none", color: "var(--ink-3)", fontSize: 12.5, cursor: "pointer", marginBottom: 12, padding: 0, fontFamily: "inherit" }}>
+              ← back
+            </button>
+            {forgotSent ? (
+              <p style={{ fontSize: 13.5, color: "var(--ink-1)", display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <Check size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                If that email is on an account, we've sent a reset link. It expires in 30 minutes.
+              </p>
+            ) : (
+              <>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 }}>Enter your account email</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <TextInput autoFocus type="email" placeholder="you@company.com" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitForgot()} />
+                  <Button onClick={submitForgot} disabled={!forgotEmail.trim() || forgotBusy}><Mail size={13} /> Send link</Button>
+                </div>
+              </>
+            )}
           </div>
         ) : !picked ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -51,6 +92,9 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
                 {e.role === "admin" && <Shield size={13} style={{ marginLeft: "auto", color: "var(--ink-3)" }} />}
               </button>
             ))}
+            <button onClick={() => { setForgotMode(true); setForgotSent(false); setForgotEmail(""); }} style={{ background: "none", border: "none", color: "var(--ink-3)", fontSize: 12.5, cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
+              Forgot your PIN?
+            </button>
           </div>
         ) : (
           <div style={{ textAlign: "left" }}>
@@ -63,6 +107,9 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
               <Button onClick={tryLogin}><Lock size={13} /> Unlock</Button>
             </div>
             {err && <p style={{ fontSize: 12.5, color: "#B5654A", marginTop: 8 }}>{err}</p>}
+            <button onClick={() => { setForgotMode(true); setForgotSent(false); setForgotEmail(""); }} style={{ background: "none", border: "none", color: "var(--ink-3)", fontSize: 12.5, cursor: "pointer", marginTop: 10, padding: 0, fontFamily: "inherit" }}>
+              Forgot your PIN?
+            </button>
           </div>
         )}
         <p style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 22, lineHeight: 1.5 }}>
