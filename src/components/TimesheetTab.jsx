@@ -153,7 +153,7 @@ export default function TimesheetTab({ data, setData, currentUser }) {
           <tfoot>
             <tr style={{ borderTop: "2px solid var(--line)", fontWeight: 700 }}>
               <td style={{ padding: "10px 16px", color: "var(--ink-2)" }}>Daily total</td>
-              {days.map((d) => <td key={d} style={{ padding: "10px 6px", textAlign: "center", fontFamily: "var(--mono)", fontSize: 12.5 }}>{fmtHours(dayTotal(d)).replace(" ", "")}</td>)}
+              {days.map((d) => <td key={d} style={{ padding: "10px 6px", textAlign: "center", fontFamily: "var(--mono)", fontSize: 12.5 }}>{fmtHours(dayTotal(d)).replace(/ /g, "")}</td>)}
               <td style={{ padding: "10px 16px", textAlign: "right", fontFamily: "var(--mono)" }}>{fmtHours(weekTotal)}</td>
             </tr>
           </tfoot>

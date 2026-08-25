@@ -7,9 +7,11 @@ export const todayStr = () => new Date().toISOString().slice(0, 10);
 export const fmtHours = (h) => {
   const sign = h < 0 ? "-" : "";
   h = Math.abs(h || 0);
-  const hrs = Math.floor(h);
-  const mins = Math.round((h - hrs) * 60);
-  return `${sign}${hrs}h ${mins.toString().padStart(2, "0")}m`;
+  const totalSeconds = Math.round(h * 3600);
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return `${sign}${hrs}h ${mins.toString().padStart(2, "0")}m ${secs.toString().padStart(2, "0")}s`;
 };
 
 export const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", weekday: "short" });
@@ -32,11 +34,11 @@ export const weekDates = (weekStart) => Array.from({ length: 7 }, (_, i) => addD
 
 export const rangeToHours = (start, end) => {
   if (!start || !end) return 0;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let mins = (eh * 60 + em) - (sh * 60 + sm);
-  if (mins < 0) mins += 24 * 60;
-  return Math.round((mins / 60) * 100) / 100;
+  const [sh, sm, ss = 0] = start.split(":").map(Number);
+  const [eh, em, es = 0] = end.split(":").map(Number);
+  let secs = (eh * 3600 + em * 60 + es) - (sh * 3600 + sm * 60 + ss);
+  if (secs < 0) secs += 24 * 3600;
+  return Math.round(secs) / 3600;
 };
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

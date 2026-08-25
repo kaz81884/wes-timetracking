@@ -86,7 +86,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
       if (hrs > 0.005) {
         nextEntries = [...data.timeEntries, {
           id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
-          notes, hours: Math.round(hrs * 100) / 100, date: todayStr(), billable, mode: "duration",
+          notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "duration",
         }];
       }
       const newStart = Date.now();
@@ -123,7 +123,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     const nextTimers = { ...data.timers };
     delete nextTimers[currentUser.id];
     if (hrs > 0.005) {
-      const entry = { id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null, notes, hours: Math.round(hrs * 100) / 100, date: todayStr(), billable, mode: "duration" };
+      const entry = { id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null, notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "duration" };
       setData({ ...data, timeEntries: [...data.timeEntries, entry], timers: nextTimers });
     } else {
       setData({ ...data, timers: nextTimers });
@@ -228,8 +228,8 @@ export default function LogTimeTab({ data, setData, currentUser }) {
               <TextInput type="number" step="0.25" min="0" placeholder="Hours" value={manualHours} onChange={(e) => setManualHours(e.target.value)} />
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <TextInput type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                <TextInput type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <TextInput type="time" step="1" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <TextInput type="time" step="1" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
               </div>
             )}
             <Select value={projectId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value), computeDefaultEngagement(e.target.value))}>
