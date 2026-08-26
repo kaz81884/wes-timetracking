@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, Play, Square, Plus, AlertCircle, Pencil } from "lucide-react";
 import { Card, Select, TextInput, Button, Toggle, projectOptionGroups } from "./ui";
-import { uid, todayStr, rangeToHours } from "../lib/utils";
+import { uid, todayStr, fmtTimeHMS, rangeToHours } from "../lib/utils";
 
 export default function LogTimeTab({ data, setData, currentUser }) {
   const activeProjects = data.projects.filter((p) => p.status !== "inactive");
@@ -81,12 +81,14 @@ export default function LogTimeTab({ data, setData, currentUser }) {
   // immediately — no need to stop and restart between short activities.
   const applySelection = (nextProjectId, nextTaskId, nextEngagementId) => {
     if (timerStart) {
-      const hrs = (Date.now() - timerStart) / 3600000;
+      const now = Date.now();
+      const hrs = (now - timerStart) / 3600000;
       let nextEntries = data.timeEntries;
       if (hrs > 0.005) {
         nextEntries = [...data.timeEntries, {
           id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
-          notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "duration",
+          notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
+          start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
         }];
       }
       const newStart = Date.now();
@@ -119,11 +121,16 @@ export default function LogTimeTab({ data, setData, currentUser }) {
   };
 
   const stopTimer = () => {
+    const now = Date.now();
     const hrs = elapsed / 3600;
     const nextTimers = { ...data.timers };
     delete nextTimers[currentUser.id];
     if (hrs > 0.005) {
-      const entry = { id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null, notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "duration" };
+      const entry = {
+        id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+        notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
+        start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
+      };
       setData({ ...data, timeEntries: [...data.timeEntries, entry], timers: nextTimers });
     } else {
       setData({ ...data, timers: nextTimers });

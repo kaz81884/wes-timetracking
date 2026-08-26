@@ -14,6 +14,11 @@ export const fmtHours = (h) => {
   return `${sign}${hrs}h ${mins.toString().padStart(2, "0")}m ${secs.toString().padStart(2, "0")}s`;
 };
 
+export const fmtTimeHMS = (date) => {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+};
+
 export const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", weekday: "short" });
 export const fmtDateShort = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 

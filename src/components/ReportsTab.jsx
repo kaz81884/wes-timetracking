@@ -1,10 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { Download } from "lucide-react";
-import { Card, Pill, Select, TextInput, Button, projectOptionGroups } from "./ui";
+import { Download, Pencil } from "lucide-react";
+import { Card, Pill, Select, TextInput, Button, IconBtn, projectOptionGroups } from "./ui";
 import { todayStr, fmtHours, fmtDate, startOfWeek } from "../lib/utils";
+import EditEntryForm from "./EditEntryForm";
+import DeleteEntryButton from "./DeleteEntryButton";
 
-export default function ReportsTab({ data, currentUser }) {
+export default function ReportsTab({ data, setData, currentUser }) {
   const isAdmin = currentUser.role === "admin";
+  const [editingId, setEditingId] = useState(null);
+
+  const canManage = (entry) => isAdmin || entry.employeeId === currentUser.id;
+  const deleteEntry = (id) => setData({ ...data, timeEntries: data.timeEntries.filter((e) => e.id !== id) });
   const [from, setFrom] = useState(startOfWeek(todayStr()));
   const [to, setTo] = useState(todayStr());
   const [employeeFilter, setEmployeeFilter] = useState(isAdmin ? "all" : currentUser.id);
@@ -166,6 +172,7 @@ export default function ReportsTab({ data, currentUser }) {
                 <th style={{ padding: "8px" }}>Project</th>
                 <th style={{ padding: "8px" }}>Activity</th>
                 <th style={{ padding: "8px 20px", textAlign: "right" }}>Hours</th>
+                <th style={{ padding: "8px 20px" }}></th>
               </tr>
             </thead>
             <tbody>
@@ -175,6 +182,16 @@ export default function ReportsTab({ data, currentUser }) {
                 const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
                 const task = data.taskTypes.find((t) => t.id === e.taskId);
                 const engagement = data.engagements.find((en) => en.id === e.engagementId);
+                const colCount = isAdmin ? 8 : 7;
+                if (editingId === e.id) {
+                  return (
+                    <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
+                      <td colSpan={colCount} style={{ padding: "9px 20px" }}>
+                        <EditEntryForm data={data} setData={setData} entry={e} onDone={() => setEditingId(null)} />
+                      </td>
+                    </tr>
+                  );
+                }
                 return (
                   <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
                     <td style={{ padding: "9px 20px", color: "var(--ink-2)" }}>{fmtDate(e.date)}</td>
@@ -184,6 +201,14 @@ export default function ReportsTab({ data, currentUser }) {
                     <td style={{ padding: "9px", color: "var(--ink-2)" }}>{engagement?.name || "—"}</td>
                     <td style={{ padding: "9px", color: "var(--ink-2)" }}>{task?.name || "—"}</td>
                     <td style={{ padding: "9px 20px", textAlign: "right", fontFamily: "var(--mono)", color: "var(--ink-1)" }}>{fmtHours(e.hours)}</td>
+                    <td style={{ padding: "9px 20px" }}>
+                      {canManage(e) && (
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <IconBtn title="Edit entry" onClick={() => setEditingId(e.id)}><Pencil size={14} /></IconBtn>
+                          <DeleteEntryButton onConfirm={() => deleteEntry(e.id)} />
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

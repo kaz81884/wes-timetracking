@@ -110,7 +110,7 @@ export default function App() {
         {tab === "timesheet" && <TimesheetTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "companies" && isAdmin && <CompaniesTab data={data} setData={setData} />}
         {tab === "team" && isAdmin && <TeamTab data={data} setData={setData} currentUser={currentUser} />}
-        {tab === "reports" && <ReportsTab data={data} currentUser={currentUser} />}
+        {tab === "reports" && <ReportsTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "profile" && <ProfileTab data={data} setData={setData} currentUser={currentUser} />}
       </div>
     </div>
