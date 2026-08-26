@@ -4,6 +4,15 @@ export const DEFAULT_TASK_TYPES = ["Manage Inbox", "Calendar Management", "Resea
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 export const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// Appends one audit event (edit or delete of a time entry) to data.auditLog.
+// `before`/`after` are full entry snapshots (an edit has both, a delete only
+// `before`) so the log stays self-contained even after the entry itself is
+// gone — deleting a row can't erase the record that it happened.
+export const logAudit = (data, { action, actor, entryId, before, after }) => ({
+  ...data,
+  auditLog: [...(data.auditLog || []), { id: uid(), action, entryId, actorId: actor.id, actorName: actor.name, timestamp: Date.now(), before: before || null, after: after || null }],
+});
+
 export const fmtHours = (h) => {
   const sign = h < 0 ? "-" : "";
   h = Math.abs(h || 0);

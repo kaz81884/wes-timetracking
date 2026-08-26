@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Download, Pencil } from "lucide-react";
 import { Card, Pill, Select, TextInput, Button, IconBtn, projectOptionGroups } from "./ui";
-import { todayStr, fmtHours, fmtDate, startOfWeek } from "../lib/utils";
+import { todayStr, fmtHours, fmtDate, startOfWeek, logAudit } from "../lib/utils";
 import EditEntryForm from "./EditEntryForm";
 import DeleteEntryButton from "./DeleteEntryButton";
 
@@ -10,7 +10,10 @@ export default function ReportsTab({ data, setData, currentUser }) {
   const [editingId, setEditingId] = useState(null);
 
   const canManage = (entry) => isAdmin || entry.employeeId === currentUser.id;
-  const deleteEntry = (id) => setData({ ...data, timeEntries: data.timeEntries.filter((e) => e.id !== id) });
+  const deleteEntry = (entry) => setData(logAudit(
+    { ...data, timeEntries: data.timeEntries.filter((e) => e.id !== entry.id) },
+    { action: "delete", actor: currentUser, entryId: entry.id, before: entry },
+  ));
   const [from, setFrom] = useState(startOfWeek(todayStr()));
   const [to, setTo] = useState(todayStr());
   const [employeeFilter, setEmployeeFilter] = useState(isAdmin ? "all" : currentUser.id);
@@ -187,7 +190,7 @@ export default function ReportsTab({ data, setData, currentUser }) {
                   return (
                     <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
                       <td colSpan={colCount} style={{ padding: "9px 20px" }}>
-                        <EditEntryForm data={data} setData={setData} entry={e} onDone={() => setEditingId(null)} />
+                        <EditEntryForm data={data} setData={setData} entry={e} currentUser={currentUser} onDone={() => setEditingId(null)} />
                       </td>
                     </tr>
                   );
@@ -205,7 +208,7 @@ export default function ReportsTab({ data, setData, currentUser }) {
                       {canManage(e) && (
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                           <IconBtn title="Edit entry" onClick={() => setEditingId(e.id)}><Pencil size={14} /></IconBtn>
-                          <DeleteEntryButton onConfirm={() => deleteEntry(e.id)} />
+                          <DeleteEntryButton onConfirm={() => deleteEntry(e)} />
                         </div>
                       )}
                     </td>

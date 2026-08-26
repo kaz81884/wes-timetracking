@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Check, X } from "lucide-react";
 import { Select, TextInput, Button, Toggle, projectOptionGroups } from "./ui";
-import { todayStr, fmtHours, rangeToHours } from "../lib/utils";
+import { todayStr, fmtHours, rangeToHours, logAudit } from "../lib/utils";
 
 // Inline edit form for a single time entry — used by ReportsTab and
 // TimesheetTab. Duration is always derived from start/end time, never typed
 // directly, so an edited entry's hours can't drift from its actual clock
 // times — including for timer-based entries, which only ever stored a
 // duration, not clock times, until edited here.
-export default function EditEntryForm({ data, setData, entry, onDone }) {
+export default function EditEntryForm({ data, setData, entry, currentUser, onDone }) {
   const [date, setDate] = useState(entry.date);
   const [projectId, setProjectId] = useState(entry.projectId || "");
   const [taskId, setTaskId] = useState(entry.taskId || "");
@@ -28,13 +28,15 @@ export default function EditEntryForm({ data, setData, entry, onDone }) {
 
   const save = () => {
     if (!startTime || !endTime || computedHours <= 0) { setError("Enter both a start and end time."); return; }
-    setData({
-      ...data,
-      timeEntries: data.timeEntries.map((e) => e.id === entry.id ? {
-        ...e, date, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
-        notes, billable, hours: computedHours, mode: "range", start: startTime, end: endTime,
-      } : e),
-    });
+    const updated = {
+      ...entry, date, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+      notes, billable, hours: computedHours, mode: "range", start: startTime, end: endTime,
+      updatedBy: currentUser.id, updatedAt: Date.now(),
+    };
+    setData(logAudit(
+      { ...data, timeEntries: data.timeEntries.map((e) => e.id === entry.id ? updated : e) },
+      { action: "edit", actor: currentUser, entryId: entry.id, before: entry, after: updated },
+    ));
     onDone();
   };
 

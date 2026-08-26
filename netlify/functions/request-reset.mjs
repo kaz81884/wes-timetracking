@@ -11,6 +11,7 @@ const DEFAULT_DATA = {
   timers: {},
   timesheets: {},
   passwordResets: {},
+  auditLog: [],
 };
 
 // Netlify's equivalent of server/index.js's POST /api/request-reset, backed

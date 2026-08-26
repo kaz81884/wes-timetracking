@@ -10,6 +10,7 @@ export const DEFAULT_DATA = {
   timers: {},
   timesheets: {},
   passwordResets: {},
+  auditLog: [],
 };
 
 // Migrates data saved by an older version of the app: per-project `tasks`

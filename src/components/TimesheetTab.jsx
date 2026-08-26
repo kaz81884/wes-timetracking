@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Check, X, Pencil } from "lucide-react";
 import { Card, Pill, Select, Button, IconBtn, projectOptionGroups } from "./ui";
-import { uid, todayStr, fmtHours, fmtDateShort, startOfWeek, addDays, weekDates } from "../lib/utils";
+import { uid, todayStr, fmtHours, fmtDateShort, startOfWeek, addDays, weekDates, logAudit } from "../lib/utils";
 import EditEntryForm from "./EditEntryForm";
 import DeleteEntryButton from "./DeleteEntryButton";
 
@@ -57,7 +57,10 @@ export default function TimesheetTab({ data, setData, currentUser }) {
   const rowTotal = (projectId, taskId) => days.reduce((s, d) => s + (gridEntries.find((x) => x.projectId === projectId && x.taskId === taskId && x.date === d)?.hours || 0), 0);
   const dayTotal = (d) => myWeekEntries.filter((e) => e.date === d).reduce((s, e) => s + e.hours, 0);
 
-  const deleteEntry = (id) => setData({ ...data, timeEntries: data.timeEntries.filter((e) => e.id !== id) });
+  const deleteEntry = (entry) => setData(logAudit(
+    { ...data, timeEntries: data.timeEntries.filter((e) => e.id !== entry.id) },
+    { action: "delete", actor: currentUser, entryId: entry.id, before: entry },
+  ));
 
   const setSheetStatus = (status) => {
     setData({ ...data, timesheets: { ...data.timesheets, [key]: { status, submittedAt: status === "submitted" ? Date.now() : null } } });
@@ -173,17 +176,26 @@ export default function TimesheetTab({ data, setData, currentUser }) {
           <div style={{ display: "grid", gap: 8 }}>
             {otherEntries.map((e) => {
               const proj = data.projects.find((p) => p.id === e.projectId);
+              const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
+              const task = data.taskTypes.find((t) => t.id === e.taskId);
               if (editingId === e.id) {
-                return <EditEntryForm key={e.id} data={data} setData={setData} entry={e} onDone={() => setEditingId(null)} />;
+                return <EditEntryForm key={e.id} data={data} setData={setData} entry={e} currentUser={currentUser} onDone={() => setEditingId(null)} />;
               }
               return (
                 <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, gap: 10 }}>
-                  <span style={{ color: "var(--ink-2)" }}>{fmtDateShort(e.date)} · {proj?.name || "—"}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div>
+                    <div style={{ color: "var(--ink-1)", fontWeight: 600 }}>
+                      {fmtDateShort(e.date)} · {client?.name || "—"} · {proj?.name || "—"} · {task?.name || "—"}
+                    </div>
+                    {e.start && e.end && (
+                      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{e.start} – {e.end}</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <span style={{ fontFamily: "var(--mono)", color: "var(--ink-1)" }}>{fmtHours(e.hours)}</span>
                     <div style={{ display: "flex", gap: 6 }}>
                       <IconBtn title="Edit entry" onClick={() => setEditingId(e.id)}><Pencil size={14} /></IconBtn>
-                      <DeleteEntryButton onConfirm={() => deleteEntry(e.id)} />
+                      <DeleteEntryButton onConfirm={() => deleteEntry(e)} />
                     </div>
                   </div>
                 </div>

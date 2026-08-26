@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield, AlertCircle, UserCircle } from "lucide-react";
+import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield, AlertCircle, UserCircle, History } from "lucide-react";
 import { useAppData } from "./lib/data";
 import { uid, DEFAULT_TASK_TYPES } from "./lib/utils";
 import LoginScreen from "./components/LoginScreen";
@@ -11,6 +11,7 @@ import CompaniesTab from "./components/CompaniesTab";
 import TeamTab from "./components/TeamTab";
 import ReportsTab from "./components/ReportsTab";
 import ProfileTab from "./components/ProfileTab";
+import AuditLogTab from "./components/AuditLogTab";
 
 export default function App() {
   const { data, setData, loading, saving, error } = useAppData();
@@ -62,6 +63,7 @@ export default function App() {
     { id: "companies", label: "Companies", icon: Building2, show: isAdmin },
     { id: "team", label: "Team", icon: Users, show: isAdmin },
     { id: "reports", label: "Reports", icon: BarChart3, show: true },
+    { id: "audit", label: "Audit log", icon: History, show: isAdmin },
     { id: "profile", label: "Profile", icon: UserCircle, show: true },
   ].filter((t) => t.show);
 
@@ -111,6 +113,7 @@ export default function App() {
         {tab === "companies" && isAdmin && <CompaniesTab data={data} setData={setData} />}
         {tab === "team" && isAdmin && <TeamTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "reports" && <ReportsTab data={data} setData={setData} currentUser={currentUser} />}
+        {tab === "audit" && isAdmin && <AuditLogTab data={data} />}
         {tab === "profile" && <ProfileTab data={data} setData={setData} currentUser={currentUser} />}
       </div>
     </div>
