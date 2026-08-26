@@ -61,14 +61,14 @@ export default function ReportsTab({ data, setData, currentUser }) {
   }, [filtered, data.projects, data.clients]);
 
   const exportCsv = () => {
-    const rows = [["Date", "Employee", "Company", "Contact", "Project", "Activity", "Hours", "Billable", "Notes"]];
+    const rows = [["Date", "Employee", "Company", "Contact", "Project", "Activity", "Duration", "Hours", "Billable", "Notes"]];
     filtered.forEach((e) => {
       const emp = data.employees.find((x) => x.id === e.employeeId);
       const proj = data.projects.find((p) => p.id === e.projectId);
       const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
       const task = data.taskTypes.find((t) => t.id === e.taskId);
       const engagement = data.engagements.find((en) => en.id === e.engagementId);
-      rows.push([e.date, emp?.name || "", client?.name || "", proj?.name || "", engagement?.name || "", task?.name || "", e.hours, e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
+      rows.push([e.date, emp?.name || "", client?.name || "", proj?.name || "", engagement?.name || "", task?.name || "", (Math.round(e.hours * 100) / 100).toFixed(2), fmtHours(e.hours), e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
