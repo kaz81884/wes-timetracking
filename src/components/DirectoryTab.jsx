@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { BookUser, Building2, Plus, Check, X, Trash2, Pencil, Phone, Mail, MapPin, StickyNote, Search } from "lucide-react";
-import { Card, TextInput, Button, IconBtn } from "./ui";
+import { BookUser, Building2, Plus, Check, X, Trash2, Pencil, Phone, Mail, MapPin, StickyNote } from "lucide-react";
+import { Card, Select, TextInput, Button, IconBtn } from "./ui";
 import { uid, formatPhone } from "../lib/utils";
 
-const emptyPerson = () => ({ firstName: "", lastName: "", nickname: "", title: "", email: "", address: "", notes: "", phones: [{ id: uid(), label: "", number: "" }] });
+const emptyPerson = () => ({ firstName: "", lastName: "", nickname: "", title: "", email: "", address: "", city: "", state: "", zip: "", notes: "", phones: [{ id: uid(), label: "", number: "" }] });
+
+const cityStateZip = (p) => [p.city, [p.state, p.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
 function PersonForm({ initial, onSave, onCancel }) {
   const [person, setPerson] = useState(initial);
@@ -24,6 +26,9 @@ function PersonForm({ initial, onSave, onCancel }) {
       title: person.title.trim(),
       email: person.email.trim(),
       address: person.address.trim(),
+      city: person.city.trim(),
+      state: person.state.trim(),
+      zip: person.zip.trim(),
       notes: person.notes.trim(),
       phones: person.phones.filter((p) => p.label.trim() || p.number.trim()).map((p) => ({ id: p.id, label: p.label.trim(), number: p.number.trim() })),
     });
@@ -38,7 +43,12 @@ function PersonForm({ initial, onSave, onCancel }) {
       </div>
       <TextInput placeholder="Title (optional)" value={person.title} onChange={(e) => set("title", e.target.value)} />
       <TextInput type="email" placeholder="Email (optional)" value={person.email} onChange={(e) => set("email", e.target.value)} />
-      <TextInput placeholder="Address (optional)" value={person.address} onChange={(e) => set("address", e.target.value)} />
+      <TextInput placeholder="Street address (optional)" value={person.address} onChange={(e) => set("address", e.target.value)} />
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 8 }}>
+        <TextInput placeholder="City (optional)" value={person.city} onChange={(e) => set("city", e.target.value)} />
+        <TextInput placeholder="State (optional)" value={person.state} onChange={(e) => set("state", e.target.value)} />
+        <TextInput placeholder="Zip (optional)" value={person.zip} onChange={(e) => set("zip", e.target.value)} />
+      </div>
 
       <div>
         <div style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>Phone numbers</div>
@@ -70,18 +80,35 @@ export default function DirectoryTab({ data, setData, currentUser }) {
   const isAdmin = currentUser.role === "admin";
   const [addingFor, setAddingFor] = useState(null); // clientId currently showing its add-person form
   const [editingId, setEditingId] = useState(null);
-  const [search, setSearch] = useState("");
+  const [clientFilter, setClientFilter] = useState("all");
+  const [firstNameFilter, setFirstNameFilter] = useState("");
+  const [lastNameFilter, setLastNameFilter] = useState("");
+  const [titleFilter, setTitleFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
 
-  const query = search.trim().toLowerCase();
-  const matches = (p) => {
-    if (!query) return true;
-    const haystack = [p.firstName, p.lastName, p.nickname, p.title, p.email, p.notes, ...(p.phones || []).map((ph) => ph.number)].join(" ").toLowerCase();
-    return haystack.includes(query);
+  const has = (value, filter) => !filter || value === filter;
+  const matches = (p) => has(p.firstName, firstNameFilter) && has(p.lastName, lastNameFilter) && has(p.title, titleFilter) && has(p.city, cityFilter);
+
+  // dropdown options only reflect people at the currently selected company,
+  // so picking a company first narrows the rest to values that actually exist there
+  const directoryInScope = clientFilter === "all" ? (data.directory || []) : (data.directory || []).filter((p) => p.clientId === clientFilter);
+  const uniqueValues = (key) => [...new Set(directoryInScope.map((p) => (p[key] || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const firstNameOptions = useMemo(() => uniqueValues("firstName"), [directoryInScope]);
+  const lastNameOptions = useMemo(() => uniqueValues("lastName"), [directoryInScope]);
+  const titleOptions = useMemo(() => uniqueValues("title"), [directoryInScope]);
+  const cityOptions = useMemo(() => uniqueValues("city"), [directoryInScope]);
+
+  const selectClient = (id) => {
+    setClientFilter(id);
+    setFirstNameFilter(""); setLastNameFilter(""); setTitleFilter(""); setCityFilter("");
   };
+
   const visibleClients = useMemo(() => {
-    if (!query) return data.clients;
-    return data.clients.filter((c) => (data.directory || []).some((p) => p.clientId === c.id && matches(p)));
-  }, [data.clients, data.directory, query]);
+    const clients = clientFilter === "all" ? data.clients : data.clients.filter((c) => c.id === clientFilter);
+    return clients.filter((c) => (data.directory || []).some((p) => p.clientId === c.id && matches(p)));
+  }, [data.clients, data.directory, clientFilter, firstNameFilter, lastNameFilter, titleFilter, cityFilter]);
+
+  const anyFilterActive = clientFilter !== "all" || firstNameFilter || lastNameFilter || titleFilter || cityFilter;
 
   const addPerson = (clientId, person) => {
     setData({ ...data, directory: [...(data.directory || []), { id: uid(), clientId, ...person }] });
@@ -103,16 +130,54 @@ export default function DirectoryTab({ data, setData, currentUser }) {
         <p style={{ fontSize: 12.5, color: "var(--ink-3)", margin: "4px 0 14px" }}>
           A reference list of people at each company — not tied to time entries, just names, titles, and contact info everyone can look up.
         </p>
-        <div style={{ position: "relative", maxWidth: 320 }}>
-          <Search size={14} color="var(--ink-3)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-          <TextInput placeholder="Search by name, title, email, phone…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ paddingLeft: 32 }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Company</div>
+            <Select value={clientFilter} onChange={(e) => selectClient(e.target.value)} style={{ minWidth: 160 }}>
+              <option value="all">All companies</option>
+              {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>First name</div>
+            <Select value={firstNameFilter} onChange={(e) => setFirstNameFilter(e.target.value)} style={{ minWidth: 130 }}>
+              <option value="">All</option>
+              {firstNameOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Last name</div>
+            <Select value={lastNameFilter} onChange={(e) => setLastNameFilter(e.target.value)} style={{ minWidth: 130 }}>
+              <option value="">All</option>
+              {lastNameOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Title</div>
+            <Select value={titleFilter} onChange={(e) => setTitleFilter(e.target.value)} style={{ minWidth: 130 }}>
+              <option value="">All</option>
+              {titleOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>City</div>
+            <Select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} style={{ minWidth: 130 }}>
+              <option value="">All</option>
+              {cityOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </Select>
+          </div>
+          {anyFilterActive && (
+            <Button variant="ghost" onClick={() => { setClientFilter("all"); setFirstNameFilter(""); setLastNameFilter(""); setTitleFilter(""); setCityFilter(""); }}>
+              Clear filters
+            </Button>
+          )}
         </div>
       </Card>
 
       {data.clients.length === 0 ? (
         <Card><p style={{ fontSize: 13, color: "var(--ink-3)" }}>No companies yet — add one on the Companies tab first.</p></Card>
       ) : visibleClients.length === 0 ? (
-        <Card><p style={{ fontSize: 13, color: "var(--ink-3)" }}>No one matches "{search}".</p></Card>
+        <Card><p style={{ fontSize: 13, color: "var(--ink-3)" }}>No one matches these filters.</p></Card>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
           {visibleClients.map((client) => {
@@ -159,9 +224,13 @@ export default function DirectoryTab({ data, setData, currentUser }) {
                             <Mail size={12} color="var(--ink-3)" /> {p.email}
                           </div>
                         )}
-                        {p.address && (
+                        {(p.address || p.city || p.state || p.zip) && (
                           <div style={{ display: "flex", alignItems: "flex-start", gap: 5, fontSize: 12.5, color: "var(--ink-2)", marginTop: 6 }}>
-                            <MapPin size={12} color="var(--ink-3)" style={{ marginTop: 2, flexShrink: 0 }} /> {p.address}
+                            <MapPin size={12} color="var(--ink-3)" style={{ marginTop: 2, flexShrink: 0 }} />
+                            <div>
+                              {p.address && <div>{p.address}</div>}
+                              {cityStateZip(p) && <div>{cityStateZip(p)}</div>}
+                            </div>
                           </div>
                         )}
                         {p.notes && (
