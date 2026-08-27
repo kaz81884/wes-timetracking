@@ -21,6 +21,7 @@ const DEFAULT_DATA = {
   timesheets: {},
   passwordResets: {},
   auditLog: [],
+  directory: [],
 };
 
 function readData() {

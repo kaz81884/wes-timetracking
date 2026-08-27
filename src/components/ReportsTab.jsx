@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Download, Pencil } from "lucide-react";
-import { Card, Pill, Select, TextInput, Button, IconBtn, projectOptionGroups } from "./ui";
-import { todayStr, fmtHours, fmtDate, startOfWeek, logAudit } from "../lib/utils";
+import { Card, Pill, Select, TextInput, Button, IconBtn } from "./ui";
+import { todayStr, fmtHours, fmtDate, startOfWeek, logAudit, clientIdForEntry, colorForClient } from "../lib/utils";
 import EditEntryForm from "./EditEntryForm";
 import DeleteEntryButton from "./DeleteEntryButton";
 
@@ -18,28 +18,22 @@ export default function ReportsTab({ data, setData, currentUser }) {
   const [to, setTo] = useState(todayStr());
   const [employeeFilter, setEmployeeFilter] = useState(isAdmin ? "all" : currentUser.id);
   const [clientFilter, setClientFilter] = useState("all");
-  const [projectFilter, setProjectFilter] = useState("all");
   const [taskFilter, setTaskFilter] = useState("all");
-  const [engagementFilter, setEngagementFilter] = useState("all");
 
-  const projectsInClient = clientFilter === "all" ? data.projects : data.projects.filter((p) => p.clientId === clientFilter);
-  const engagementsInClient = clientFilter === "all" ? data.engagements : data.engagements.filter((e) => e.clientId === clientFilter);
-  const availableTasks = projectFilter === "all"
+  const availableTasks = clientFilter === "all"
     ? data.taskTypes
-    : data.taskTypes.filter((t) => (data.projects.find((p) => p.id === projectFilter)?.taskIds || []).includes(t.id));
+    : data.taskTypes.filter((t) => (data.clients.find((c) => c.id === clientFilter)?.taskIds || []).includes(t.id));
 
   const filtered = useMemo(() => {
     return data.timeEntries.filter((e) => {
       if (e.date < from || e.date > to) return false;
       if (!isAdmin && e.employeeId !== currentUser.id) return false;
       if (isAdmin && employeeFilter !== "all" && e.employeeId !== employeeFilter) return false;
-      if (clientFilter !== "all" && data.projects.find((p) => p.id === e.projectId)?.clientId !== clientFilter) return false;
-      if (projectFilter !== "all" && e.projectId !== projectFilter) return false;
+      if (clientFilter !== "all" && clientIdForEntry(e, data.projects) !== clientFilter) return false;
       if (taskFilter !== "all" && e.taskId !== taskFilter) return false;
-      if (engagementFilter !== "all" && e.engagementId !== engagementFilter) return false;
       return true;
     });
-  }, [data.timeEntries, data.projects, from, to, employeeFilter, clientFilter, projectFilter, taskFilter, engagementFilter, isAdmin, currentUser.id]);
+  }, [data.timeEntries, data.projects, from, to, employeeFilter, clientFilter, taskFilter, isAdmin, currentUser.id]);
 
   const total = filtered.reduce((s, e) => s + e.hours, 0);
   const billable = filtered.filter((e) => e.billable).reduce((s, e) => s + e.hours, 0);
@@ -53,7 +47,7 @@ export default function ReportsTab({ data, setData, currentUser }) {
   const byCompany = useMemo(() => {
     const map = {};
     filtered.forEach((e) => {
-      const cid = data.projects.find((p) => p.id === e.projectId)?.clientId;
+      const cid = clientIdForEntry(e, data.projects);
       if (!cid) return;
       map[cid] = (map[cid] || 0) + e.hours;
     });
@@ -61,14 +55,12 @@ export default function ReportsTab({ data, setData, currentUser }) {
   }, [filtered, data.projects, data.clients]);
 
   const exportCsv = () => {
-    const rows = [["Date", "Employee", "Company", "Contact", "Project", "Activity", "Duration", "Hours", "Billable", "Notes"]];
+    const rows = [["Date", "Employee", "Company", "Activity", "Duration", "Hours", "Billable", "Notes"]];
     filtered.forEach((e) => {
       const emp = data.employees.find((x) => x.id === e.employeeId);
-      const proj = data.projects.find((p) => p.id === e.projectId);
-      const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
+      const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
       const task = data.taskTypes.find((t) => t.id === e.taskId);
-      const engagement = data.engagements.find((en) => en.id === e.engagementId);
-      rows.push([e.date, emp?.name || "", client?.name || "", proj?.name || "", engagement?.name || "", task?.name || "", (Math.round(e.hours * 100) / 100).toFixed(2), fmtHours(e.hours), e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
+      rows.push([e.date, emp?.name || "", client?.name || "", task?.name || "", (Math.round(e.hours * 100) / 100).toFixed(2), fmtHours(e.hours), e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -95,16 +87,9 @@ export default function ReportsTab({ data, setData, currentUser }) {
           )}
           <div>
             <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Company</div>
-            <Select value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setProjectFilter("all"); setTaskFilter("all"); setEngagementFilter("all"); }} style={{ minWidth: 150 }}>
+            <Select value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setTaskFilter("all"); }} style={{ minWidth: 150 }}>
               <option value="all">All companies</option>
               {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </div>
-          <div>
-            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Contact</div>
-            <Select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setTaskFilter("all"); }} style={{ minWidth: 150 }}>
-              <option value="all">All contacts</option>
-              {projectOptionGroups(projectsInClient, data.clients)}
             </Select>
           </div>
           <div>
@@ -112,13 +97,6 @@ export default function ReportsTab({ data, setData, currentUser }) {
             <Select value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} style={{ minWidth: 150 }}>
               <option value="all">All activities</option>
               {availableTasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </Select>
-          </div>
-          <div>
-            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 5, fontWeight: 600 }}>Project</div>
-            <Select value={engagementFilter} onChange={(e) => setEngagementFilter(e.target.value)} style={{ minWidth: 150 }}>
-              <option value="all">All projects</option>
-              {engagementsInClient.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </Select>
           </div>
           <Button variant="ghost" onClick={exportCsv} style={{ marginLeft: "auto" }}><Download size={14} /> Export CSV</Button>
@@ -171,8 +149,6 @@ export default function ReportsTab({ data, setData, currentUser }) {
                 <th style={{ padding: "8px 20px" }}>Date</th>
                 {isAdmin && <th style={{ padding: "8px" }}>Who</th>}
                 <th style={{ padding: "8px" }}>Company</th>
-                <th style={{ padding: "8px" }}>Contact</th>
-                <th style={{ padding: "8px" }}>Project</th>
                 <th style={{ padding: "8px" }}>Activity</th>
                 <th style={{ padding: "8px 20px", textAlign: "right" }}>Hours</th>
                 <th style={{ padding: "8px 20px" }}></th>
@@ -181,11 +157,9 @@ export default function ReportsTab({ data, setData, currentUser }) {
             <tbody>
               {[...filtered].sort((a, b) => (a.date < b.date ? 1 : -1)).map((e) => {
                 const emp = data.employees.find((x) => x.id === e.employeeId);
-                const proj = data.projects.find((p) => p.id === e.projectId);
-                const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
+                const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
                 const task = data.taskTypes.find((t) => t.id === e.taskId);
-                const engagement = data.engagements.find((en) => en.id === e.engagementId);
-                const colCount = isAdmin ? 8 : 7;
+                const colCount = isAdmin ? 6 : 5;
                 if (editingId === e.id) {
                   return (
                     <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
@@ -199,9 +173,7 @@ export default function ReportsTab({ data, setData, currentUser }) {
                   <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
                     <td style={{ padding: "9px 20px", color: "var(--ink-2)" }}>{fmtDate(e.date)}</td>
                     {isAdmin && <td style={{ padding: "9px", color: "var(--ink-2)" }}>{emp?.name || "—"}</td>}
-                    <td style={{ padding: "9px", color: "var(--ink-2)" }}>{client?.name || "—"}</td>
-                    <td style={{ padding: "9px" }}>{proj ? <Pill color={proj.color}>{proj.name}</Pill> : "—"}</td>
-                    <td style={{ padding: "9px", color: "var(--ink-2)" }}>{engagement?.name || "—"}</td>
+                    <td style={{ padding: "9px" }}>{client ? <Pill color={colorForClient(client)}>{client.name}</Pill> : "—"}</td>
                     <td style={{ padding: "9px", color: "var(--ink-2)" }}>{task?.name || "—"}</td>
                     <td style={{ padding: "9px 20px", textAlign: "right", fontFamily: "var(--mono)", color: "var(--ink-1)" }}>{fmtHours(e.hours)}</td>
                     <td style={{ padding: "9px 20px" }}>

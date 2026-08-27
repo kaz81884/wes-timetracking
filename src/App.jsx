@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield, AlertCircle, UserCircle, History } from "lucide-react";
+import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield, AlertCircle, UserCircle, History, BookUser } from "lucide-react";
 import { useAppData } from "./lib/data";
 import { uid, DEFAULT_TASK_TYPES } from "./lib/utils";
 import LoginScreen from "./components/LoginScreen";
@@ -12,6 +12,7 @@ import TeamTab from "./components/TeamTab";
 import ReportsTab from "./components/ReportsTab";
 import ProfileTab from "./components/ProfileTab";
 import AuditLogTab from "./components/AuditLogTab";
+import DirectoryTab from "./components/DirectoryTab";
 
 export default function App() {
   const { data, setData, loading, saving, error } = useAppData();
@@ -61,6 +62,7 @@ export default function App() {
     { id: "timer", label: "Log time", icon: Clock, show: true },
     { id: "timesheet", label: "Timesheet", icon: ListChecks, show: true },
     { id: "companies", label: "Companies", icon: Building2, show: isAdmin },
+    { id: "directory", label: "Directory", icon: BookUser, show: true },
     { id: "team", label: "Team", icon: Users, show: isAdmin },
     { id: "reports", label: "Reports", icon: BarChart3, show: true },
     { id: "audit", label: "Audit log", icon: History, show: isAdmin },
@@ -111,6 +113,7 @@ export default function App() {
         {tab === "timer" && <LogTimeTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "timesheet" && <TimesheetTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "companies" && isAdmin && <CompaniesTab data={data} setData={setData} />}
+        {tab === "directory" && <DirectoryTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "team" && isAdmin && <TeamTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "reports" && <ReportsTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "audit" && isAdmin && <AuditLogTab data={data} />}

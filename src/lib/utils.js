@@ -23,9 +23,33 @@ export const fmtHours = (h) => {
   return `${sign}${hrs}h ${mins.toString().padStart(2, "0")}m ${secs.toString().padStart(2, "0")}s`;
 };
 
+// Formats digits as the user types into (123)456-7890, capped at 10 digits.
+export const formatPhone = (value) => {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)})${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
 export const fmtTimeHMS = (date) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+};
+
+// Resolves which company a time entry belongs to, whether it was logged the
+// current way (entry.clientId, set directly) or predates that — logged
+// against a contact whose company has to be looked up via projectId.
+export const clientIdForEntry = (entry, projects) => entry.clientId || (projects || []).find((p) => p.id === entry.projectId)?.clientId || null;
+
+// A stable color per company even for ones created before `clients` had a
+// `color` field of its own (contacts always did) — hashes the id instead of
+// picking randomly, so the same company always lands on the same color.
+export const colorForClient = (client) => {
+  if (!client) return "#B7BFC7";
+  if (client.color) return client.color;
+  const hash = [...client.id].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  return PROJECT_COLORS[hash % PROJECT_COLORS.length];
 };
 
 export const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", weekday: "short" });

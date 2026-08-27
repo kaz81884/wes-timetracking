@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, Play, Square, Plus, AlertCircle, Pencil } from "lucide-react";
-import { Card, Select, TextInput, Button, Toggle, projectOptionGroups } from "./ui";
+import { Card, Select, TextInput, Button, Toggle } from "./ui";
 import { uid, todayStr, fmtTimeHMS, rangeToHours } from "../lib/utils";
 
 export default function LogTimeTab({ data, setData, currentUser }) {
-  const activeProjects = data.projects.filter((p) => p.status !== "inactive");
-  const [projectId, setProjectId] = useState(activeProjects[0]?.id || "");
+  const [clientId, setClientId] = useState(data.clients[0]?.id || "");
   const [taskId, setTaskId] = useState("");
-  const [engagementId, setEngagementId] = useState("");
   const [notes, setNotes] = useState("");
   const [billable, setBillable] = useState(true);
 
@@ -21,23 +19,17 @@ export default function LogTimeTab({ data, setData, currentUser }) {
   const [elapsed, setElapsed] = useState(0);
   const resumedRef = useRef(false);
 
-  const project = data.projects.find((p) => p.id === projectId);
-  const tasks = project ? data.taskTypes.filter((t) => project.taskIds.includes(t.id)) : [];
-  const companyEngagements = project ? data.engagements.filter((e) => e.clientId === project.clientId && e.status !== "archived") : [];
+  const client = data.clients.find((c) => c.id === clientId);
+  const tasks = client ? data.taskTypes.filter((t) => (client.taskIds || []).includes(t.id)) : [];
 
   useEffect(() => {
-    if (!projectId && activeProjects.length) setProjectId(activeProjects[0].id);
-  }, [data.projects]);
+    if (!clientId && data.clients.length) setClientId(data.clients[0].id);
+  }, [data.clients]);
 
   useEffect(() => {
-    if (project && tasks.length && !tasks.find((t) => t.id === taskId)) setTaskId(tasks[0].id);
-    if (project && !tasks.length) setTaskId("");
-  }, [projectId, data.projects]);
-
-  useEffect(() => {
-    if (project && !companyEngagements.find((e) => e.id === engagementId)) setEngagementId(computeDefaultEngagement(projectId));
-    if (!project) setEngagementId("");
-  }, [projectId, data.projects, data.engagements]);
+    if (client && tasks.length && !tasks.find((t) => t.id === taskId)) setTaskId(tasks[0].id);
+    if (client && !tasks.length) setTaskId("");
+  }, [clientId, data.clients]);
 
   // resume a timer that was left running (e.g. browser closed mid-shift)
   useEffect(() => {
@@ -45,9 +37,8 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     const t = data.timers[currentUser.id];
     if (t) {
       setTimerStart(t.startedAt);
-      setProjectId(t.projectId);
+      setClientId(t.clientId);
       setTaskId(t.taskId || "");
-      setEngagementId(t.engagementId || "");
       setNotes(t.notes || "");
       setBillable(t.billable !== false);
     }
@@ -61,32 +52,23 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     return () => clearInterval(t);
   }, [timerStart]);
 
-  const computeDefaultTask = (pid) => {
-    const proj = data.projects.find((p) => p.id === pid);
-    const list = proj ? data.taskTypes.filter((t) => proj.taskIds.includes(t.id)) : [];
+  const computeDefaultTask = (cid) => {
+    const c = data.clients.find((x) => x.id === cid);
+    const list = c ? data.taskTypes.filter((t) => (c.taskIds || []).includes(t.id)) : [];
     return list[0]?.id || "";
   };
 
-  // the most recently created active project (billing cycle) for a contact's company
-  const computeDefaultEngagement = (pid) => {
-    const proj = data.projects.find((p) => p.id === pid);
-    if (!proj) return "";
-    const list = data.engagements.filter((e) => e.clientId === proj.clientId && e.status !== "archived");
-    if (!list.length) return "";
-    return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0].id;
-  };
-
-  // switching the contact, activity, or project while the timer is running saves the
+  // switching the company or activity while the timer is running saves the
   // segment just worked (e.g. 3 min of Manage Inbox) and starts a fresh segment
   // immediately — no need to stop and restart between short activities.
-  const applySelection = (nextProjectId, nextTaskId, nextEngagementId) => {
+  const applySelection = (nextClientId, nextTaskId) => {
     if (timerStart) {
       const now = Date.now();
       const hrs = (now - timerStart) / 3600000;
       let nextEntries = data.timeEntries;
       if (hrs > 0.005) {
         nextEntries = [...data.timeEntries, {
-          id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+          id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
           notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
           start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
         }];
@@ -95,20 +77,19 @@ export default function LogTimeTab({ data, setData, currentUser }) {
       setData({
         ...data,
         timeEntries: nextEntries,
-        timers: { ...data.timers, [currentUser.id]: { startedAt: newStart, projectId: nextProjectId, taskId: nextTaskId, engagementId: nextEngagementId, notes: "", billable } },
+        timers: { ...data.timers, [currentUser.id]: { startedAt: newStart, clientId: nextClientId, taskId: nextTaskId, notes: "", billable } },
       });
       setTimerStart(newStart);
       setElapsed(0);
       setNotes("");
     }
-    setProjectId(nextProjectId);
+    setClientId(nextClientId);
     setTaskId(nextTaskId);
-    setEngagementId(nextEngagementId);
   };
 
   const addEntry = (hours, dateStr, extra = {}) => {
     const entry = {
-      id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+      id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
       notes, hours, date: dateStr, billable, mode: "duration", ...extra,
     };
     setData({ ...data, timeEntries: [...data.timeEntries, entry] });
@@ -117,7 +98,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
   const startTimer = () => {
     const startedAt = Date.now();
     setTimerStart(startedAt);
-    setData({ ...data, timers: { ...data.timers, [currentUser.id]: { startedAt, projectId, taskId, engagementId, notes, billable } } });
+    setData({ ...data, timers: { ...data.timers, [currentUser.id]: { startedAt, clientId, taskId, notes, billable } } });
   };
 
   const stopTimer = () => {
@@ -127,7 +108,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     delete nextTimers[currentUser.id];
     if (hrs > 0.005) {
       const entry = {
-        id: uid(), employeeId: currentUser.id, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+        id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
         notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
         start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
       };
@@ -155,7 +136,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     setNotes("");
   };
 
-  const noProjects = activeProjects.length === 0;
+  const noCompanies = data.clients.length === 0;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 20, alignItems: "start" }}>
@@ -165,10 +146,10 @@ export default function LogTimeTab({ data, setData, currentUser }) {
           <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)" }}>Live timer</span>
         </div>
 
-        {noProjects ? (
+        {noCompanies ? (
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "var(--wash)", padding: 14, borderRadius: 10, fontSize: 13, color: "var(--ink-2)" }}>
             <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            No active contacts yet. Add a company and a contact on the Companies tab before logging time.
+            No companies yet. Add one on the Companies tab before logging time.
           </div>
         ) : (
           <>
@@ -176,11 +157,11 @@ export default function LogTimeTab({ data, setData, currentUser }) {
               {new Date(elapsed * 1000).toISOString().slice(11, 19)}
             </div>
             <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-              <Select value={projectId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value), computeDefaultEngagement(e.target.value))}>
-                {projectOptionGroups(activeProjects, data.clients)}
+              <Select value={clientId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value))}>
+                {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
-              <Select value={taskId} onChange={(e) => applySelection(projectId, e.target.value, engagementId)}>
-                {tasks.length === 0 && <option value="">No activities assigned to this contact</option>}
+              <Select value={taskId} onChange={(e) => applySelection(clientId, e.target.value)}>
+                {tasks.length === 0 && <option value="">No activities assigned to this company</option>}
                 {tasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </Select>
               {tasks.length === 0 && (
@@ -188,10 +169,6 @@ export default function LogTimeTab({ data, setData, currentUser }) {
                   Activities are managed by an admin on the Companies tab, so they stay consistent across every client.
                 </p>
               )}
-              <Select value={engagementId} onChange={(e) => applySelection(projectId, taskId, e.target.value)}>
-                <option value="">No project (not tied to a billing cycle)</option>
-                {companyEngagements.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </Select>
               <TextInput placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
               <Toggle checked={billable} onChange={setBillable} label="Billable" />
             </div>
@@ -204,7 +181,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
                 <Square size={13} /> Stop & save
               </Button>
             )}
-            {timerStart && <p style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 10, textAlign: "center" }}>Running — switch the contact or activity above anytime and it saves what you just logged, then keeps going. Safe to refresh too.</p>}
+            {timerStart && <p style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 10, textAlign: "center" }}>Running — switch the company or activity above anytime and it saves what you just logged, then keeps going. Safe to refresh too.</p>}
           </>
         )}
       </Card>
@@ -214,8 +191,8 @@ export default function LogTimeTab({ data, setData, currentUser }) {
           <Pencil size={15} color="var(--ink-3)" />
           <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)" }}>Log time manually</span>
         </div>
-        {noProjects ? (
-          <p style={{ fontSize: 13, color: "var(--ink-3)" }}>Add a company and a contact first.</p>
+        {noCompanies ? (
+          <p style={{ fontSize: 13, color: "var(--ink-3)" }}>Add a company first.</p>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 6, background: "var(--wash)", borderRadius: 9, padding: 3 }}>
@@ -239,16 +216,12 @@ export default function LogTimeTab({ data, setData, currentUser }) {
                 <TextInput type="time" step="1" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
               </div>
             )}
-            <Select value={projectId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value), computeDefaultEngagement(e.target.value))}>
-              {projectOptionGroups(activeProjects, data.clients)}
+            <Select value={clientId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value))}>
+              {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
-            <Select value={taskId} onChange={(e) => applySelection(projectId, e.target.value, engagementId)}>
+            <Select value={taskId} onChange={(e) => applySelection(clientId, e.target.value)}>
               {tasks.length === 0 && <option value="">No activities assigned</option>}
               {tasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </Select>
-            <Select value={engagementId} onChange={(e) => applySelection(projectId, taskId, e.target.value)}>
-              <option value="">No project (not tied to a billing cycle)</option>
-              {companyEngagements.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </Select>
             <TextInput placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
             <Toggle checked={billable} onChange={setBillable} label="Billable" />

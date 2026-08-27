@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Check, X } from "lucide-react";
-import { Select, TextInput, Button, Toggle, projectOptionGroups } from "./ui";
-import { todayStr, fmtHours, rangeToHours, logAudit } from "../lib/utils";
+import { Select, TextInput, Button, Toggle } from "./ui";
+import { todayStr, fmtHours, rangeToHours, logAudit, clientIdForEntry } from "../lib/utils";
 
 // Inline edit form for a single time entry — used by ReportsTab and
 // TimesheetTab. Duration is always derived from start/end time, never typed
@@ -10,26 +10,23 @@ import { todayStr, fmtHours, rangeToHours, logAudit } from "../lib/utils";
 // duration, not clock times, until edited here.
 export default function EditEntryForm({ data, setData, entry, currentUser, onDone }) {
   const [date, setDate] = useState(entry.date);
-  const [projectId, setProjectId] = useState(entry.projectId || "");
+  const [clientId, setClientId] = useState(clientIdForEntry(entry, data.projects) || "");
   const [taskId, setTaskId] = useState(entry.taskId || "");
-  const [engagementId, setEngagementId] = useState(entry.engagementId || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [billable, setBillable] = useState(entry.billable !== false);
   const [startTime, setStartTime] = useState(entry.start || "");
   const [endTime, setEndTime] = useState(entry.end || "");
   const [error, setError] = useState("");
 
-  const project = data.projects.find((p) => p.id === projectId);
-  const projectChoices = data.projects.filter((p) => p.status !== "inactive" || p.id === entry.projectId);
-  const tasks = project ? data.taskTypes.filter((t) => project.taskIds.includes(t.id)) : [];
-  const companyEngagements = project ? data.engagements.filter((e) => e.clientId === project.clientId && (e.status !== "archived" || e.id === entry.engagementId)) : [];
+  const client = data.clients.find((c) => c.id === clientId);
+  const tasks = client ? data.taskTypes.filter((t) => (client.taskIds || []).includes(t.id)) : [];
 
   const computedHours = rangeToHours(startTime, endTime);
 
   const save = () => {
     if (!startTime || !endTime || computedHours <= 0) { setError("Enter both a start and end time."); return; }
     const updated = {
-      ...entry, date, projectId: projectId || null, taskId: taskId || null, engagementId: engagementId || null,
+      ...entry, date, clientId: clientId || null, taskId: taskId || null,
       notes, billable, hours: computedHours, mode: "range", start: startTime, end: endTime,
       updatedBy: currentUser.id, updatedAt: Date.now(),
     };
@@ -53,27 +50,19 @@ export default function EditEntryForm({ data, setData, entry, currentUser, onDon
         <Field label="Date">
           <TextInput type="date" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        <Field label="Contact">
-          <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setTaskId(""); setEngagementId(""); }}>
-            <option value="">No contact</option>
-            {projectOptionGroups(projectChoices, data.clients)}
+        <Field label="Company">
+          <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setTaskId(""); }}>
+            <option value="">No company</option>
+            {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <Field label="Activity">
-          <Select value={taskId} onChange={(e) => setTaskId(e.target.value)}>
-            <option value="">No activity</option>
-            {tasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Project">
-          <Select value={engagementId} onChange={(e) => setEngagementId(e.target.value)}>
-            <option value="">No project</option>
-            {companyEngagements.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </Select>
-        </Field>
-      </div>
+      <Field label="Activity">
+        <Select value={taskId} onChange={(e) => setTaskId(e.target.value)}>
+          <option value="">No activity</option>
+          {tasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </Select>
+      </Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <Field label="Start time">
           <TextInput type="time" step="1" value={startTime} onChange={(e) => setStartTime(e.target.value)} />

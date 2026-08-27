@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { fmtHours } from "../lib/utils";
+import { fmtHours, clientIdForEntry, colorForClient } from "../lib/utils";
 
 export function IconBtn({ onClick, title, children, danger, disabled }) {
   return (
@@ -144,7 +144,7 @@ export function projectOptionGroups(projects, clients) {
   });
 }
 
-export function DayRibbon({ entries, projects, dateStr }) {
+export function DayRibbon({ entries, clients, projects, dateStr }) {
   const dayEntries = entries.filter((e) => e.date === dateStr);
   const total = dayEntries.reduce((s, e) => s + e.hours, 0);
   const cap = Math.max(total, 8);
@@ -161,9 +161,9 @@ export function DayRibbon({ entries, projects, dateStr }) {
       ) : (
         <div style={{ display: "flex", height: 34, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)" }}>
           {dayEntries.map((e) => {
-            const proj = projects.find((p) => p.id === e.projectId);
+            const client = clients.find((c) => c.id === clientIdForEntry(e, projects));
             const w = (e.hours / cap) * 100;
-            return <div key={e.id} title={`${proj ? proj.name : "Unassigned"} · ${fmtHours(e.hours)}`} style={{ width: `${w}%`, minWidth: e.hours > 0 ? 3 : 0, background: proj ? proj.color : "#B7BFC7" }} />;
+            return <div key={e.id} title={`${client ? client.name : "Unassigned"} · ${fmtHours(e.hours)}`} style={{ width: `${w}%`, minWidth: e.hours > 0 ? 3 : 0, background: client ? colorForClient(client) : "#B7BFC7" }} />;
           })}
         </div>
       )}

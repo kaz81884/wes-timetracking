@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Check, X, Pencil } from "lucide-react";
-import { Card, Pill, Select, Button, IconBtn, projectOptionGroups } from "./ui";
-import { uid, todayStr, fmtHours, fmtDateShort, startOfWeek, addDays, weekDates, logAudit } from "../lib/utils";
+import { Card, Pill, Select, Button, IconBtn } from "./ui";
+import { uid, todayStr, fmtHours, fmtDateShort, startOfWeek, addDays, weekDates, logAudit, clientIdForEntry, colorForClient } from "../lib/utils";
 import EditEntryForm from "./EditEntryForm";
 import DeleteEntryButton from "./DeleteEntryButton";
 
@@ -20,41 +20,42 @@ export default function TimesheetTab({ data, setData, currentUser }) {
   const rowKeys = useMemo(() => {
     const seen = new Map();
     gridEntries.forEach((e) => {
-      const k = `${e.projectId}::${e.taskId}`;
-      if (!seen.has(k)) seen.set(k, { projectId: e.projectId, taskId: e.taskId });
+      const cid = clientIdForEntry(e, data.projects);
+      const k = `${cid}::${e.taskId}`;
+      if (!seen.has(k)) seen.set(k, { clientId: cid, taskId: e.taskId });
     });
     return [...seen.values()];
-  }, [gridEntries]);
+  }, [gridEntries, data.projects]);
 
   const [addingRow, setAddingRow] = useState(false);
-  const [newProjectId, setNewProjectId] = useState(data.projects[0]?.id || "");
+  const [newClientId, setNewClientId] = useState(data.clients[0]?.id || "");
   const [newTaskId, setNewTaskId] = useState("");
 
-  const cellValue = (projectId, taskId, date) => {
-    const e = gridEntries.find((x) => x.projectId === projectId && x.taskId === taskId && x.date === date);
+  const cellValue = (clientId, taskId, date) => {
+    const e = gridEntries.find((x) => clientIdForEntry(x, data.projects) === clientId && x.taskId === taskId && x.date === date);
     return e ? e.hours : "";
   };
 
-  const setCell = (projectId, taskId, date, value) => {
+  const setCell = (clientId, taskId, date, value) => {
     if (submitted) return;
     const h = parseFloat(value);
-    const existingIdx = data.timeEntries.findIndex((x) => x.employeeId === currentUser.id && x.projectId === projectId && x.taskId === taskId && x.date === date && x.gridRow);
+    const existingIdx = data.timeEntries.findIndex((x) => x.employeeId === currentUser.id && clientIdForEntry(x, data.projects) === clientId && x.taskId === taskId && x.date === date && x.gridRow);
     let entries = [...data.timeEntries];
     if (!value || isNaN(h) || h <= 0) {
       if (existingIdx > -1) entries.splice(existingIdx, 1);
     } else if (existingIdx > -1) {
       entries[existingIdx] = { ...entries[existingIdx], hours: h };
     } else {
-      entries.push({ id: uid(), employeeId: currentUser.id, projectId, taskId, date, hours: h, notes: "", billable: true, mode: "duration", gridRow: true });
+      entries.push({ id: uid(), employeeId: currentUser.id, clientId, taskId, date, hours: h, notes: "", billable: true, mode: "duration", gridRow: true });
     }
     setData({ ...data, timeEntries: entries });
   };
 
   const [localRows, setLocalRows] = useState([]);
-  const allRows = [...rowKeys, ...localRows.filter((lr) => !rowKeys.find((r) => r.projectId === lr.projectId && r.taskId === lr.taskId))];
+  const allRows = [...rowKeys, ...localRows.filter((lr) => !rowKeys.find((r) => r.clientId === lr.clientId && r.taskId === lr.taskId))];
 
   const weekTotal = myWeekEntries.reduce((s, e) => s + e.hours, 0);
-  const rowTotal = (projectId, taskId) => days.reduce((s, d) => s + (gridEntries.find((x) => x.projectId === projectId && x.taskId === taskId && x.date === d)?.hours || 0), 0);
+  const rowTotal = (clientId, taskId) => days.reduce((s, d) => s + (gridEntries.find((x) => clientIdForEntry(x, data.projects) === clientId && x.taskId === taskId && x.date === d)?.hours || 0), 0);
   const dayTotal = (d) => myWeekEntries.filter((e) => e.date === d).reduce((s, e) => s + e.hours, 0);
 
   const deleteEntry = (entry) => setData(logAudit(
@@ -66,8 +67,8 @@ export default function TimesheetTab({ data, setData, currentUser }) {
     setData({ ...data, timesheets: { ...data.timesheets, [key]: { status, submittedAt: status === "submitted" ? Date.now() : null } } });
   };
 
-  const newProjectTasks = data.projects.find((p) => p.id === newProjectId)?.taskIds || [];
-  const newProjectTaskOptions = data.taskTypes.filter((t) => newProjectTasks.includes(t.id));
+  const newClient = data.clients.find((c) => c.id === newClientId);
+  const newClientTaskOptions = data.taskTypes.filter((t) => (newClient?.taskIds || []).includes(t.id));
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -99,29 +100,27 @@ export default function TimesheetTab({ data, setData, currentUser }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ textAlign: "left", color: "var(--ink-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em" }}>
-              <th style={{ padding: "12px 16px", minWidth: 200 }}>Company · Contact · Activity</th>
+              <th style={{ padding: "12px 16px", minWidth: 200 }}>Company · Activity</th>
               {days.map((d) => <th key={d} style={{ padding: "12px 6px", textAlign: "center", minWidth: 64 }}>{fmtDateShort(d)}</th>)}
               <th style={{ padding: "12px 16px", textAlign: "right" }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {allRows.map((r) => {
-              const proj = data.projects.find((p) => p.id === r.projectId);
-              const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
+              const client = data.clients.find((c) => c.id === r.clientId);
               const task = data.taskTypes.find((t) => t.id === r.taskId);
               return (
-                <tr key={`${r.projectId}::${r.taskId}`} style={{ borderTop: "1px solid var(--line)" }}>
+                <tr key={`${r.clientId}::${r.taskId}`} style={{ borderTop: "1px solid var(--line)" }}>
                   <td style={{ padding: "8px 16px" }}>
-                    <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 600, marginBottom: 2 }}>{client?.name || "—"}</div>
-                    {proj ? <Pill color={proj.color}>{proj.name}</Pill> : "—"}
+                    {client ? <Pill color={colorForClient(client)}>{client.name}</Pill> : "—"}
                     <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>{task?.name || "—"}</div>
                   </td>
                   {days.map((d) => (
                     <td key={d} style={{ padding: "6px" }}>
                       <input
                         type="number" step="0.25" min="0" disabled={submitted}
-                        value={cellValue(r.projectId, r.taskId, d)}
-                        onChange={(e) => setCell(r.projectId, r.taskId, d, e.target.value)}
+                        value={cellValue(r.clientId, r.taskId, d)}
+                        onChange={(e) => setCell(r.clientId, r.taskId, d, e.target.value)}
                         placeholder="–"
                         style={{
                           width: "100%", textAlign: "center", border: "1px solid var(--line)", borderRadius: 7,
@@ -130,7 +129,7 @@ export default function TimesheetTab({ data, setData, currentUser }) {
                       />
                     </td>
                   ))}
-                  <td style={{ padding: "8px 16px", textAlign: "right", fontFamily: "var(--mono)", fontWeight: 600 }}>{fmtHours(rowTotal(r.projectId, r.taskId))}</td>
+                  <td style={{ padding: "8px 16px", textAlign: "right", fontFamily: "var(--mono)", fontWeight: 600 }}>{fmtHours(rowTotal(r.clientId, r.taskId))}</td>
                 </tr>
               );
             })}
@@ -139,14 +138,14 @@ export default function TimesheetTab({ data, setData, currentUser }) {
                 <td colSpan={9} style={{ padding: "10px 16px" }}>
                   {addingRow ? (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <Select value={newProjectId} onChange={(e) => { setNewProjectId(e.target.value); setNewTaskId(""); }} style={{ maxWidth: 200 }}>
-                        {projectOptionGroups(data.projects, data.clients)}
+                      <Select value={newClientId} onChange={(e) => { setNewClientId(e.target.value); setNewTaskId(""); }} style={{ maxWidth: 200 }}>
+                        {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </Select>
                       <Select value={newTaskId} onChange={(e) => setNewTaskId(e.target.value)} style={{ maxWidth: 180 }}>
                         <option value="">Choose an activity</option>
-                        {newProjectTaskOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {newClientTaskOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </Select>
-                      <Button variant="subtle" disabled={!newProjectId || !newTaskId} onClick={() => { setLocalRows([...localRows, { projectId: newProjectId, taskId: newTaskId }]); setAddingRow(false); }}><Check size={14} /></Button>
+                      <Button variant="subtle" disabled={!newClientId || !newTaskId} onClick={() => { setLocalRows([...localRows, { clientId: newClientId, taskId: newTaskId }]); setAddingRow(false); }}><Check size={14} /></Button>
                       <Button variant="subtle" onClick={() => setAddingRow(false)}><X size={14} /></Button>
                     </div>
                   ) : (
@@ -175,8 +174,7 @@ export default function TimesheetTab({ data, setData, currentUser }) {
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {otherEntries.map((e) => {
-              const proj = data.projects.find((p) => p.id === e.projectId);
-              const client = proj ? data.clients.find((c) => c.id === proj.clientId) : null;
+              const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
               const task = data.taskTypes.find((t) => t.id === e.taskId);
               if (editingId === e.id) {
                 return <EditEntryForm key={e.id} data={data} setData={setData} entry={e} currentUser={currentUser} onDone={() => setEditingId(null)} />;
@@ -185,7 +183,7 @@ export default function TimesheetTab({ data, setData, currentUser }) {
                 <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, gap: 10 }}>
                   <div>
                     <div style={{ color: "var(--ink-1)", fontWeight: 600 }}>
-                      {fmtDateShort(e.date)} · {client?.name || "—"} · {proj?.name || "—"} · {task?.name || "—"}
+                      {fmtDateShort(e.date)} · {client?.name || "—"} · {task?.name || "—"}
                     </div>
                     {e.start && e.end && (
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{e.start} – {e.end}</div>

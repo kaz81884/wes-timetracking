@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { History, Pencil, Trash2 } from "lucide-react";
 import { Card, Select } from "./ui";
-import { fmtHours } from "../lib/utils";
+import { fmtHours, clientIdForEntry } from "../lib/utils";
 
 // A field's raw value plus how to render it for a human, keyed by what an
 // entry snapshot (before/after) stores.
@@ -12,12 +12,11 @@ export default function AuditLogTab({ data }) {
 
   const nameFor = {
     employee: (id) => data.employees.find((e) => e.id === id)?.name || "—",
-    project: (id) => data.projects.find((p) => p.id === id)?.name || "—",
+    client: (id) => data.clients.find((c) => c.id === id)?.name || "—",
     task: (id) => data.taskTypes.find((t) => t.id === id)?.name || "—",
-    engagement: (id) => data.engagements.find((e) => e.id === id)?.name || "—",
   };
 
-  const describeSnapshot = (s) => s ? `${nameFor.project(s.projectId)} · ${nameFor.task(s.taskId)}` : "—";
+  const describeSnapshot = (s) => s ? `${nameFor.client(clientIdForEntry(s, data.projects))} · ${nameFor.task(s.taskId)}` : "—";
 
   const describeChanges = (before, after) => {
     if (!before || !after) return [];
@@ -27,9 +26,10 @@ export default function AuditLogTab({ data }) {
       const fmt = key === "hours" ? fmtHours : key === "billable" ? (v) => (v === false ? "No" : "Yes") : (v) => v || "—";
       diffs.push({ label: FIELD_LABELS[key], from: fmt(before[key]), to: fmt(after[key]) });
     });
-    if (before.projectId !== after.projectId) diffs.push({ label: "Contact", from: nameFor.project(before.projectId), to: nameFor.project(after.projectId) });
+    const beforeClientId = clientIdForEntry(before, data.projects);
+    const afterClientId = clientIdForEntry(after, data.projects);
+    if (beforeClientId !== afterClientId) diffs.push({ label: "Company", from: nameFor.client(beforeClientId), to: nameFor.client(afterClientId) });
     if (before.taskId !== after.taskId) diffs.push({ label: "Activity", from: nameFor.task(before.taskId), to: nameFor.task(after.taskId) });
-    if (before.engagementId !== after.engagementId) diffs.push({ label: "Project", from: nameFor.engagement(before.engagementId), to: nameFor.engagement(after.engagementId) });
     if (before.start !== after.start || before.end !== after.end) diffs.push({ label: "Time", from: before.start ? `${before.start}–${before.end}` : "—", to: after.start ? `${after.start}–${after.end}` : "—" });
     return diffs;
   };
