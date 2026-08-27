@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { BookUser, Building2, Plus, Check, X, Trash2, Pencil, Phone, MapPin, StickyNote, Search } from "lucide-react";
+import { BookUser, Building2, Plus, Check, X, Trash2, Pencil, Phone, Mail, MapPin, StickyNote, Search } from "lucide-react";
 import { Card, TextInput, Button, IconBtn } from "./ui";
 import { uid, formatPhone } from "../lib/utils";
 
-const emptyPerson = () => ({ firstName: "", lastName: "", nickname: "", title: "", address: "", notes: "", phones: [{ id: uid(), label: "", number: "" }] });
+const emptyPerson = () => ({ firstName: "", lastName: "", nickname: "", title: "", email: "", address: "", notes: "", phones: [{ id: uid(), label: "", number: "" }] });
 
 function PersonForm({ initial, onSave, onCancel }) {
   const [person, setPerson] = useState(initial);
@@ -22,6 +22,7 @@ function PersonForm({ initial, onSave, onCancel }) {
       lastName: person.lastName.trim(),
       nickname: person.nickname.trim(),
       title: person.title.trim(),
+      email: person.email.trim(),
       address: person.address.trim(),
       notes: person.notes.trim(),
       phones: person.phones.filter((p) => p.label.trim() || p.number.trim()).map((p) => ({ id: p.id, label: p.label.trim(), number: p.number.trim() })),
@@ -36,6 +37,7 @@ function PersonForm({ initial, onSave, onCancel }) {
         <TextInput placeholder="Nickname (optional)" value={person.nickname} onChange={(e) => set("nickname", e.target.value)} />
       </div>
       <TextInput placeholder="Title (optional)" value={person.title} onChange={(e) => set("title", e.target.value)} />
+      <TextInput type="email" placeholder="Email (optional)" value={person.email} onChange={(e) => set("email", e.target.value)} />
       <TextInput placeholder="Address (optional)" value={person.address} onChange={(e) => set("address", e.target.value)} />
 
       <div>
@@ -73,7 +75,7 @@ export default function DirectoryTab({ data, setData, currentUser }) {
   const query = search.trim().toLowerCase();
   const matches = (p) => {
     if (!query) return true;
-    const haystack = [p.firstName, p.lastName, p.nickname, p.title, p.notes, ...(p.phones || []).map((ph) => ph.number)].join(" ").toLowerCase();
+    const haystack = [p.firstName, p.lastName, p.nickname, p.title, p.email, p.notes, ...(p.phones || []).map((ph) => ph.number)].join(" ").toLowerCase();
     return haystack.includes(query);
   };
   const visibleClients = useMemo(() => {
@@ -103,7 +105,7 @@ export default function DirectoryTab({ data, setData, currentUser }) {
         </p>
         <div style={{ position: "relative", maxWidth: 320 }}>
           <Search size={14} color="var(--ink-3)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-          <TextInput placeholder="Search by name, title, phone…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ paddingLeft: 32 }} />
+          <TextInput placeholder="Search by name, title, email, phone…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ paddingLeft: 32 }} />
         </div>
       </Card>
 
@@ -150,6 +152,11 @@ export default function DirectoryTab({ data, setData, currentUser }) {
                                 {ph.label && <span style={{ color: "var(--ink-3)" }}>{ph.label}:</span>} {ph.number}
                               </span>
                             ))}
+                          </div>
+                        )}
+                        {p.email && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--ink-2)", marginTop: 6 }}>
+                            <Mail size={12} color="var(--ink-3)" /> {p.email}
                           </div>
                         )}
                         {p.address && (
