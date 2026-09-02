@@ -31,7 +31,37 @@ export const pipSupported = typeof window !== "undefined" && "documentPictureInP
 // junk entries from an accidental click.
 const MIN_ENTRY_HOURS = 5 / 3600;
 
-const PIP_SIZES = { mini: { width: 260, height: 190 }, full: { width: 300, height: 320 } };
+// Generous by design: window.resizeTo() only reliably takes effect when
+// called synchronously inside a click handler (confirmed — switching
+// between mini/full works). Calls made later from effects/observers, after
+// the click's event has finished, get silently ignored by the browser. So
+// there's no fixing an undersized window after the fact — these sizes have
+// to be right the first time, which means erring generous over exact.
+const FULL_SIZE = { width: 340, height: 400 };
+const MINI_HEIGHT = 220;
+const MINI_MIN_WIDTH = 280;
+const MINI_MAX_WIDTH = 560;
+
+// Measures the "COMPANY · ACTIVITY" label at the font/transform it's
+// actually rendered at, so the mini window can be sized to fit it exactly
+// instead of truncating a long company/activity name. The label renders
+// UPPERCASE via CSS text-transform, and uppercase runs meaningfully wider
+// than mixed case — measuring the original string undercounted the width.
+let measureCanvas;
+const miniWidthFor = (label) => {
+  measureCanvas = measureCanvas || document.createElement("canvas");
+  const ctx = measureCanvas.getContext("2d");
+  ctx.font = "700 11px Inter, sans-serif";
+  const upper = label.toUpperCase();
+  let textWidth = ctx.measureText(upper).width;
+  // measureText doesn't account for the label's letter-spacing (.05em) —
+  // approximate it by adding that per character.
+  textWidth += upper.length * 11 * 0.05;
+  // padding (14 each side) + gap to the maximize button + the button itself
+  // + slack, since this only gets one chance to be right (see note above).
+  const needed = Math.ceil(textWidth) + 28 + 8 + 30 + 20;
+  return Math.min(MINI_MAX_WIDTH, Math.max(MINI_MIN_WIDTH, needed));
+};
 
 // Owns all live-timer + pop-out state. Called once from App.jsx (which stays
 // mounted regardless of which tab is active) rather than from LogTimeTab
@@ -124,24 +154,26 @@ export function useLiveTimer(data, setData, currentUser) {
     setData({ ...data, timeEntries: [...data.timeEntries, entry] });
   };
 
+  const miniLabel = `${client?.name || ""}${activeTask ? ` · ${activeTask.name}` : ""}`;
+  const sizeFor = (targetMode) => targetMode === "mini" ? { width: miniWidthFor(miniLabel), height: MINI_HEIGHT } : FULL_SIZE;
+
   // Only one Picture-in-Picture window can exist at a time — if one's
   // already open, just switch what it shows (and resize to fit) instead of
   // opening a second one.
   const openPip = async (targetMode) => {
     if (!pipSupported) return;
+    const size = sizeFor(targetMode);
     if (pipWindow) {
       setPipMode(targetMode);
-      try { pipWindow.resizeTo(PIP_SIZES[targetMode].width, PIP_SIZES[targetMode].height); } catch {}
+      try { pipWindow.resizeTo(size.width, size.height); } catch {}
       return;
     }
-    const pip = await window.documentPictureInPicture.requestWindow(PIP_SIZES[targetMode]);
+    const pip = await window.documentPictureInPicture.requestWindow(size);
     copyStylesInto(pip.document);
     // A pop-out window is its own document, so it needs the same
     // data-theme attribute copied over for dark mode to apply there too.
     const theme = document.documentElement.getAttribute("data-theme");
     if (theme) pip.document.documentElement.setAttribute("data-theme", theme);
-    pip.document.documentElement.style.height = "100%";
-    pip.document.body.style.height = "100%";
     pip.document.body.style.margin = "0";
     pip.document.body.style.boxSizing = "border-box";
     pip.document.body.style.background = "var(--body-bg)";
@@ -149,7 +181,7 @@ export function useLiveTimer(data, setData, currentUser) {
     // The size passed to requestWindow() above isn't always honored on the
     // very first pop-out of a session — an explicit resize afterward fixes
     // it reliably, same as switching between mini/full does.
-    try { pip.resizeTo(PIP_SIZES[targetMode].width, PIP_SIZES[targetMode].height); } catch {}
+    try { pip.resizeTo(size.width, size.height); } catch {}
     setPipMode(targetMode);
     setPipWindow(pip);
   };
@@ -191,10 +223,10 @@ export function useLiveTimer(data, setData, currentUser) {
         {new Date(elapsed * 1000).toISOString().slice(11, 19)}
       </div>
       <div style={{ display: "grid", gap: compact ? 6 : 10, marginBottom: compact ? 8 : 16 }}>
-        <Select value={clientId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value))} style={compact ? { padding: "5px 28px 5px 9px" } : undefined}>
+        <Select value={clientId} onChange={(e) => applySelection(e.target.value, computeDefaultTask(e.target.value))}>
           {data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
-        <Select value={taskId} onChange={(e) => applySelection(clientId, e.target.value)} style={compact ? { padding: "5px 28px 5px 9px" } : undefined}>
+        <Select value={taskId} onChange={(e) => applySelection(clientId, e.target.value)}>
           {tasks.length === 0 && <option value="">No activities assigned to this company</option>}
           {tasks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </Select>
@@ -222,7 +254,7 @@ export function useLiveTimer(data, setData, currentUser) {
   const portals = (
     <>
       {pipWindow && pipMode === "mini" && createPortal(
-        <div style={{ padding: 14, display: "grid", gap: 6, height: "100%", boxSizing: "border-box" }}>
+        <div style={{ padding: 14, display: "grid", gap: 6, boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {client?.name}{activeTask ? ` · ${activeTask.name}` : ""}
@@ -232,7 +264,7 @@ export function useLiveTimer(data, setData, currentUser) {
           <div style={{ fontFamily: "var(--mono)", fontSize: 32, fontWeight: 600, color: "var(--ink-1)" }}>
             {new Date(elapsed * 1000).toISOString().slice(11, 19)}
           </div>
-          <Button variant="danger" onClick={stopTimer} style={{ justifyContent: "center", marginTop: "auto" }}>
+          <Button variant="danger" onClick={stopTimer} style={{ justifyContent: "center" }}>
             <Square size={13} /> Stop & save
           </Button>
         </div>,
