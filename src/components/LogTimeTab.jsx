@@ -1,7 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, Play, Square, Plus, AlertCircle, Pencil } from "lucide-react";
-import { Card, Select, TextInput, Button, Toggle } from "./ui";
+import { createPortal } from "react-dom";
+import { Clock, Play, Square, Plus, AlertCircle, Pencil, PictureInPicture2 } from "lucide-react";
+import { Card, Select, TextInput, Button, IconBtn, Toggle } from "./ui";
 import { uid, todayStr, fmtTimeHMS, rangeToHours } from "../lib/utils";
+
+// Copies the main document's stylesheets into the pop-out window so the
+// floating timer matches the app's look — Document Picture-in-Picture opens
+// a blank window with none of the page's CSS by default.
+const copyStylesInto = (pipDocument) => {
+  [...document.styleSheets].forEach((sheet) => {
+    try {
+      const cssText = [...sheet.cssRules].map((r) => r.cssText).join("\n");
+      const style = pipDocument.createElement("style");
+      style.textContent = cssText;
+      pipDocument.head.appendChild(style);
+    } catch {
+      if (sheet.href) {
+        const link = pipDocument.createElement("link");
+        link.rel = "stylesheet";
+        link.href = sheet.href;
+        pipDocument.head.appendChild(link);
+      }
+    }
+  });
+};
+
+const pipSupported = typeof window !== "undefined" && "documentPictureInPicture" in window;
 
 export default function LogTimeTab({ data, setData, currentUser }) {
   const [clientId, setClientId] = useState(data.clients[0]?.id || "");
@@ -17,10 +41,12 @@ export default function LogTimeTab({ data, setData, currentUser }) {
 
   const [timerStart, setTimerStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
+  const [pipWindow, setPipWindow] = useState(null);
   const resumedRef = useRef(false);
 
   const client = data.clients.find((c) => c.id === clientId);
   const tasks = client ? data.taskTypes.filter((t) => (client.taskIds || []).includes(t.id)) : [];
+  const activeTask = tasks.find((t) => t.id === taskId);
 
   useEffect(() => {
     if (!clientId && data.clients.length) setClientId(data.clients[0].id);
@@ -95,6 +121,16 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     setData({ ...data, timeEntries: [...data.timeEntries, entry] });
   };
 
+  const openPip = async () => {
+    if (!pipSupported || pipWindow) return;
+    const pip = await window.documentPictureInPicture.requestWindow({ width: 260, height: 130 });
+    copyStylesInto(pip.document);
+    pip.document.body.style.margin = "0";
+    pip.document.body.style.background = "#FAF8F4";
+    pip.addEventListener("pagehide", () => setPipWindow(null));
+    setPipWindow(pip);
+  };
+
   const startTimer = () => {
     const startedAt = Date.now();
     setTimerStart(startedAt);
@@ -119,6 +155,7 @@ export default function LogTimeTab({ data, setData, currentUser }) {
     setTimerStart(null);
     setElapsed(0);
     setNotes("");
+    if (pipWindow) pipWindow.close();
   };
 
   const addManual = () => {
@@ -143,7 +180,12 @@ export default function LogTimeTab({ data, setData, currentUser }) {
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Clock size={16} color="var(--ink-3)" />
-          <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)" }}>Live timer</span>
+          <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)", flex: 1 }}>Live timer</span>
+          {pipSupported && timerStart && (
+            <IconBtn title={pipWindow ? "Timer is popped out" : "Pop out timer"} onClick={openPip} disabled={!!pipWindow}>
+              <PictureInPicture2 size={15} />
+            </IconBtn>
+          )}
         </div>
 
         {noCompanies ? (
@@ -229,6 +271,21 @@ export default function LogTimeTab({ data, setData, currentUser }) {
           </div>
         )}
       </Card>
+
+      {pipWindow && createPortal(
+        <div style={{ padding: 14, display: "grid", gap: 6, height: "100%", boxSizing: "border-box" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {client?.name}{activeTask ? ` · ${activeTask.name}` : ""}
+          </div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 32, fontWeight: 600, color: "var(--ink-1)" }}>
+            {new Date(elapsed * 1000).toISOString().slice(11, 19)}
+          </div>
+          <Button variant="danger" onClick={stopTimer} style={{ justifyContent: "center", marginTop: "auto" }}>
+            <Square size={13} /> Stop & save
+          </Button>
+        </div>,
+        pipWindow.document.body,
+      )}
     </div>
   );
 }
