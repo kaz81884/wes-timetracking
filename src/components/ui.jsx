@@ -13,7 +13,7 @@ export function IconBtn({ onClick, title, children, danger, disabled }) {
         color: danger ? "#B5654A" : "var(--ink-3)", opacity: disabled ? 0.4 : 1,
         transition: "background .15s, color .15s", flexShrink: 0,
       }}
-      onMouseEnter={(e) => { if (disabled) return; e.currentTarget.style.background = danger ? "#F6E7E1" : "var(--wash)"; e.currentTarget.style.color = danger ? "#B5654A" : "var(--ink-1)"; }}
+      onMouseEnter={(e) => { if (disabled) return; e.currentTarget.style.background = danger ? "var(--danger-wash)" : "var(--wash)"; e.currentTarget.style.color = danger ? "#B5654A" : "var(--ink-1)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = danger ? "#B5654A" : "var(--ink-3)"; }}
     >
       {children}
@@ -40,7 +40,7 @@ export function Select({ value, onChange, children, style, disabled }) {
       <select
         value={value} onChange={onChange} disabled={disabled}
         style={{
-          width: "100%", appearance: "none", background: disabled ? "var(--wash)" : "#fff",
+          width: "100%", appearance: "none", background: disabled ? "var(--wash)" : "var(--paper)",
           border: "1px solid var(--line)", borderRadius: 9, padding: "9px 32px 9px 12px",
           fontSize: 14, color: "var(--ink-1)", fontFamily: "inherit", cursor: disabled ? "default" : "pointer",
         }}
@@ -59,7 +59,7 @@ export function TextInput(props) {
       style={{
         width: "100%", border: "1px solid var(--line)", borderRadius: 9,
         padding: "9px 12px", fontSize: 14, color: "var(--ink-1)", fontFamily: "inherit",
-        background: props.disabled ? "var(--wash)" : "#fff", ...(props.style || {}),
+        background: props.disabled ? "var(--wash)" : "var(--paper)", ...(props.style || {}),
       }}
     />
   );
@@ -67,7 +67,7 @@ export function TextInput(props) {
 
 export function Button({ children, onClick, variant = "primary", style, type = "button", disabled }) {
   const variants = {
-    primary: { background: "var(--ink-1)", color: "#fff", border: "1px solid var(--ink-1)" },
+    primary: { background: "var(--chip)", color: "#fff", border: "1px solid var(--chip)" },
     accent: { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" },
     ghost: { background: "transparent", color: "var(--ink-1)", border: "1px solid var(--line)" },
     subtle: { background: "var(--wash)", color: "var(--ink-1)", border: "1px solid transparent" },
@@ -91,7 +91,7 @@ export function Button({ children, onClick, variant = "primary", style, type = "
 }
 
 export function Card({ children, style }) {
-  return <div style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: 14, padding: 20, ...style }}>{children}</div>;
+  return <div style={{ background: "var(--paper)", border: "1px solid var(--line)", borderRadius: 14, padding: 20, ...style }}>{children}</div>;
 }
 
 export function Toggle({ checked, onChange, label }) {
@@ -119,7 +119,7 @@ export function TaskChip({ name, active, onClick, disabled }) {
         display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "5px 11px",
         borderRadius: 100, cursor: disabled ? "default" : "pointer", fontWeight: 600, fontFamily: "inherit",
         border: active ? "1px solid var(--accent)" : "1px solid var(--line)",
-        background: active ? "var(--accent)1c" : "#fff", color: active ? "var(--accent)" : "var(--ink-3)",
+        background: active ? "var(--accent)1c" : "var(--paper)", color: active ? "var(--accent)" : "var(--ink-3)",
         opacity: disabled ? 0.6 : 1,
       }}
     >

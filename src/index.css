@@ -1,12 +1,46 @@
 :root {
+  --body-bg: #FAF8F4;
+  --paper: #ffffff;
   --wash: #F1EFEA;
   --line: #E4E0D8;
   --ink-1: #23271F;
   --ink-2: #565A4E;
   --ink-3: #8A8D80;
   --accent: #7C9885;
+  --chip: #23271F;
+  --danger-wash: #F6E7E1;
   --display: 'Newsreader', serif;
   --mono: 'IBM Plex Mono', monospace;
+}
+
+/* Follows the OS setting only when the user hasn't picked one explicitly on
+   their profile (data-theme is set/cleared there — see App.jsx). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --body-bg: #171813;
+    --paper: #1F211B;
+    --wash: #262820;
+    --line: #3A3D33;
+    --ink-1: #EDEBE2;
+    --ink-2: #B9BBAC;
+    --ink-3: #8B8E80;
+    --accent: #8FAE99;
+    --chip: #3E4136;
+    --danger-wash: #3A2620;
+  }
+}
+
+:root[data-theme="dark"] {
+  --body-bg: #171813;
+  --paper: #1F211B;
+  --wash: #262820;
+  --line: #3A3D33;
+  --ink-1: #EDEBE2;
+  --ink-2: #B9BBAC;
+  --ink-3: #8B8E80;
+  --accent: #8FAE99;
+  --chip: #3E4136;
+  --danger-wash: #3A2620;
 }
 
 * {
@@ -19,7 +53,7 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: #FAF8F4;
+  background: var(--body-bg);
   font-family: 'Inter', sans-serif;
   color: var(--ink-1);
 }

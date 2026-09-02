@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { UserCircle, Check, AlertCircle, Shield } from "lucide-react";
-import { Card, TextInput, Button } from "./ui";
+import { UserCircle, Check, AlertCircle, Shield, SunMoon } from "lucide-react";
+import { Card, Select, TextInput, Button } from "./ui";
 
 export default function ProfileTab({ data, setData, currentUser }) {
   const [name, setName] = useState(currentUser.name);
@@ -24,6 +24,10 @@ export default function ProfileTab({ data, setData, currentUser }) {
     setData({ ...data, employees: data.employees.map((e) => e.id === currentUser.id ? { ...e, email: em } : e) });
     setSuccess("Email updated.");
     setError("");
+  };
+
+  const setTheme = (theme) => {
+    setData({ ...data, employees: data.employees.map((e) => e.id === currentUser.id ? { ...e, theme } : e) });
   };
 
   const changePin = () => {
@@ -73,6 +77,18 @@ export default function ProfileTab({ data, setData, currentUser }) {
           <TextInput type="email" placeholder="Email (for PIN resets)" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveEmail()} />
           <Button variant="ghost" onClick={saveEmail} disabled={email.trim() === (currentUser.email || "")}><Check size={14} /> Save</Button>
         </div>
+      </Card>
+
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <SunMoon size={16} color="var(--ink-3)" />
+          <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)" }}>Appearance</span>
+        </div>
+        <Select value={currentUser.theme || "system"} onChange={(e) => setTheme(e.target.value)}>
+          <option value="system">Match system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </Select>
       </Card>
 
       <Card>

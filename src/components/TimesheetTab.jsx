@@ -124,7 +124,7 @@ export default function TimesheetTab({ data, setData, currentUser }) {
                         placeholder="–"
                         style={{
                           width: "100%", textAlign: "center", border: "1px solid var(--line)", borderRadius: 7,
-                          padding: "6px 4px", fontSize: 13, fontFamily: "var(--mono)", background: submitted ? "var(--wash)" : "#fff",
+                          padding: "6px 4px", fontSize: 13, fontFamily: "var(--mono)", background: submitted ? "var(--wash)" : "var(--paper)",
                         }}
                       />
                     </td>

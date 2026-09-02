@@ -30,7 +30,7 @@ export default function ResetPinScreen({ data, setData, token, onDone }) {
   return (
     <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
       <div style={{ width: 360, textAlign: "center" }}>
-        <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--ink-1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+        <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--chip)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <Clock size={22} />
         </div>
         <h1 style={{ fontFamily: "var(--display)", fontSize: 26, fontWeight: 600, color: "var(--ink-1)", margin: "0 0 6px" }}>Ledger</h1>

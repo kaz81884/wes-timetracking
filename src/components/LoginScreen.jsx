@@ -37,7 +37,7 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
   return (
     <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
       <div style={{ width: 360, textAlign: "center" }}>
-        <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--ink-1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+        <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--chip)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <Clock size={22} />
         </div>
         <h1 style={{ fontFamily: "var(--display)", fontSize: 26, fontWeight: 600, color: "var(--ink-1)", margin: "0 0 6px" }}>Ledger</h1>
@@ -81,7 +81,7 @@ export default function LoginScreen({ employees, onLogin, onBootstrapAdmin }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {employees.map((e) => (
               <button key={e.id} onClick={() => { setPicked(e); setErr(""); setPin(""); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "1px solid var(--line)", background: "#fff", cursor: "pointer", fontSize: 14.5, fontWeight: 600, color: "var(--ink-1)", fontFamily: "inherit" }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--paper)", cursor: "pointer", fontSize: 14.5, fontWeight: 600, color: "var(--ink-1)", fontFamily: "inherit" }}
                 onMouseEnter={(ev) => { ev.currentTarget.style.borderColor = "var(--accent)"; }}
                 onMouseLeave={(ev) => { ev.currentTarget.style.borderColor = "var(--line)"; }}
               >

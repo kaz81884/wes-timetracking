@@ -55,12 +55,12 @@ export default function ReportsTab({ data, setData, currentUser }) {
   }, [filtered, data.projects, data.clients]);
 
   const exportCsv = () => {
-    const rows = [["Date", "Employee", "Company", "Activity", "Duration", "Hours", "Billable", "Notes"]];
+    const rows = [["Date", "Employee", "Company", "Activity", "Start", "End", "Duration", "Hours", "Billable", "Notes"]];
     filtered.forEach((e) => {
       const emp = data.employees.find((x) => x.id === e.employeeId);
       const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
       const task = data.taskTypes.find((t) => t.id === e.taskId);
-      rows.push([e.date, emp?.name || "", client?.name || "", task?.name || "", (Math.round(e.hours * 100) / 100).toFixed(2), fmtHours(e.hours), e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
+      rows.push([e.date, emp?.name || "", client?.name || "", task?.name || "", e.start || "", e.end || "", (Math.round(e.hours * 100) / 100).toFixed(2), fmtHours(e.hours), e.billable ? "Yes" : "No", (e.notes || "").replace(/[\n,]/g, " ")]);
     });
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -142,15 +142,18 @@ export default function ReportsTab({ data, setData, currentUser }) {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "16px 20px 10px", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ink-3)", fontWeight: 700 }}>Entries ({filtered.length})</div>
-        <div style={{ maxHeight: 340, overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ maxHeight: 340, overflow: "auto" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "var(--ink-3)", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em" }}>
                 <th style={{ padding: "8px 20px" }}>Date</th>
                 {isAdmin && <th style={{ padding: "8px" }}>Who</th>}
                 <th style={{ padding: "8px" }}>Company</th>
                 <th style={{ padding: "8px" }}>Activity</th>
+                <th style={{ padding: "8px" }}>Start</th>
+                <th style={{ padding: "8px" }}>End</th>
                 <th style={{ padding: "8px 20px", textAlign: "right" }}>Hours</th>
+                <th style={{ padding: "8px", minWidth: 200 }}>Notes</th>
                 <th style={{ padding: "8px 20px" }}></th>
               </tr>
             </thead>
@@ -159,7 +162,7 @@ export default function ReportsTab({ data, setData, currentUser }) {
                 const emp = data.employees.find((x) => x.id === e.employeeId);
                 const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
                 const task = data.taskTypes.find((t) => t.id === e.taskId);
-                const colCount = isAdmin ? 6 : 5;
+                const colCount = isAdmin ? 9 : 8;
                 if (editingId === e.id) {
                   return (
                     <tr key={e.id} style={{ borderTop: "1px solid var(--line)" }}>
@@ -175,7 +178,10 @@ export default function ReportsTab({ data, setData, currentUser }) {
                     {isAdmin && <td style={{ padding: "9px", color: "var(--ink-2)" }}>{emp?.name || "—"}</td>}
                     <td style={{ padding: "9px" }}>{client ? <Pill color={colorForClient(client)}>{client.name}</Pill> : "—"}</td>
                     <td style={{ padding: "9px", color: "var(--ink-2)" }}>{task?.name || "—"}</td>
+                    <td style={{ padding: "9px", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12 }}>{e.start || "—"}</td>
+                    <td style={{ padding: "9px", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12 }}>{e.end || "—"}</td>
                     <td style={{ padding: "9px 20px", textAlign: "right", fontFamily: "var(--mono)", color: "var(--ink-1)" }}>{fmtHours(e.hours)}</td>
+                    <td style={{ padding: "9px", color: "var(--ink-2)" }}>{e.notes || "—"}</td>
                     <td style={{ padding: "9px 20px" }}>
                       {canManage(e) && (
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>

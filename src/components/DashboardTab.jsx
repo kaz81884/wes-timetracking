@@ -66,10 +66,13 @@ export default function DashboardTab({ data, currentUser }) {
               {recent.map((e) => {
                 const client = data.clients.find((c) => c.id === clientIdForEntry(e, data.projects));
                 return (
-                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", fontSize: 13, gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "var(--ink-1)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client ? client.name : "Unassigned"}</div>
-                      <div style={{ color: "var(--ink-3)", fontSize: 12 }}>{fmtDate(e.date)}</div>
+                      <div style={{ color: "var(--ink-3)", fontSize: 12 }}>
+                        {fmtDate(e.date)}{e.start && e.end ? ` · ${e.start}–${e.end}` : ""}
+                      </div>
+                      {e.notes && <div style={{ color: "var(--ink-3)", fontSize: 12, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.notes}</div>}
                     </div>
                     <span style={{ fontFamily: "var(--mono)", color: "var(--ink-2)", flexShrink: 0, marginLeft: 10 }}>{fmtHours(e.hours)}</span>
                   </div>

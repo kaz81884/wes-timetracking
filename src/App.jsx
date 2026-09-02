@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Clock, LayoutDashboard, ListChecks, Building2, Users, BarChart3, Shield, AlertCircle, UserCircle, History, BookUser } from "lucide-react";
 import { useAppData } from "./lib/data";
 import { uid, DEFAULT_TASK_TYPES } from "./lib/utils";
@@ -13,6 +13,10 @@ import ReportsTab from "./components/ReportsTab";
 import ProfileTab from "./components/ProfileTab";
 import AuditLogTab from "./components/AuditLogTab";
 import DirectoryTab from "./components/DirectoryTab";
+import { useLiveTimer } from "./lib/useLiveTimer";
+
+const EMPTY_DATA = { clients: [], taskTypes: [], timeEntries: [], timers: {} };
+const PENDING_USER = { id: "__pending__" };
 
 export default function App() {
   const { data, setData, loading, saving, error } = useAppData();
@@ -20,8 +24,25 @@ export default function App() {
   const [tab, setTab] = useState("dashboard");
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get("reset"));
 
+  const currentUser = data?.employees?.find((e) => e.id === userId) || null;
+
+  // Applies the logged-in user's theme preference (light/dark/system) to the
+  // whole document. "System" just means no override — index.css already
+  // follows prefers-color-scheme when data-theme isn't set.
+  const preferredTheme = currentUser?.theme;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (preferredTheme === "light" || preferredTheme === "dark") root.setAttribute("data-theme", preferredTheme);
+    else root.removeAttribute("data-theme");
+  }, [preferredTheme]);
+
+  // Owned here (not inside LogTimeTab) so the live timer and its pop-out
+  // window keep running/updating no matter which tab is showing — LogTimeTab
+  // unmounts on every tab switch, which used to kill the timer's state.
+  const timer = useLiveTimer(data || EMPTY_DATA, setData, currentUser || PENDING_USER);
+
   if (loading || !data) {
-    return <div style={{ padding: 60, textAlign: "center", color: "#9AA5B1" }}>Loading…</div>;
+    return <div style={{ padding: 60, textAlign: "center", color: "var(--ink-3)" }}>Loading…</div>;
   }
 
   if (resetToken) {
@@ -39,7 +60,6 @@ export default function App() {
     );
   }
 
-  const currentUser = data.employees.find((e) => e.id === userId);
   const isAdmin = currentUser?.role === "admin";
 
   if (!currentUser) {
@@ -74,7 +94,7 @@ export default function App() {
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--ink-1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><Clock size={16} /></div>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--chip)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><Clock size={16} /></div>
             <div>
               <div style={{ fontFamily: "var(--display)", fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>Ledger</div>
               <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Williams Executive Support</div>
@@ -91,7 +111,7 @@ export default function App() {
           </div>
         </div>
 
-        {error && <div style={{ display: "flex", gap: 8, alignItems: "center", background: "#F6E7E1", color: "#B5654A", padding: "10px 14px", borderRadius: 9, fontSize: 13, marginBottom: 16 }}><AlertCircle size={15} /> {error}</div>}
+        {error && <div style={{ display: "flex", gap: 8, alignItems: "center", background: "var(--danger-wash)", color: "#B5654A", padding: "10px 14px", borderRadius: 9, fontSize: 13, marginBottom: 16 }}><AlertCircle size={15} /> {error}</div>}
 
         <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "1px solid var(--line)", overflowX: "auto" }}>
           {TABS.map((t) => {
@@ -110,7 +130,7 @@ export default function App() {
         </div>
 
         {tab === "dashboard" && <DashboardTab data={data} currentUser={currentUser} />}
-        {tab === "timer" && <LogTimeTab data={data} setData={setData} currentUser={currentUser} />}
+        {tab === "timer" && <LogTimeTab data={data} timer={timer} />}
         {tab === "timesheet" && <TimesheetTab data={data} setData={setData} currentUser={currentUser} />}
         {tab === "companies" && isAdmin && <CompaniesTab data={data} setData={setData} />}
         {tab === "directory" && <DirectoryTab data={data} setData={setData} currentUser={currentUser} />}
@@ -119,6 +139,7 @@ export default function App() {
         {tab === "audit" && isAdmin && <AuditLogTab data={data} />}
         {tab === "profile" && <ProfileTab data={data} setData={setData} currentUser={currentUser} />}
       </div>
+      {timer.portals}
     </div>
   );
 }
