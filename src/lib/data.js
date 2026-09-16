@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export const DEFAULT_DATA = {
   employees: [],
@@ -90,25 +90,53 @@ export function useAppData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const fetchingRef = useRef(false);
+
+  const load = useCallback(async ({ silent } = {}) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const raw = await fetchData();
+      setDataState(migrateData(raw));
+      if (!silent) setError(null);
+    } catch (e) {
+      console.error(e);
+      if (!silent) {
+        setError("Couldn't reach the server — is it running? (npm run dev)");
+        setDataState((d) => d ?? DEFAULT_DATA);
+      }
+    } finally {
+      fetchingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await fetchData();
-        setDataState(migrateData(raw));
-      } catch (e) {
-        console.error(e);
-        setError("Couldn't reach the server — is it running? (npm run dev)");
-        setDataState(DEFAULT_DATA);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    load();
+  }, [load]);
+
+  // Each browser tab/session only ever sees the data it fetched on load —
+  // there's no push/polling sync, so a second admin sitting in an
+  // already-open tab won't see entries someone else just saved elsewhere.
+  // Refetching whenever this tab regains focus (switching back to it, or
+  // switching accounts and coming back) keeps that window's view current
+  // without constant background polling.
+  useEffect(() => {
+    const onFocus = () => { if (!savingRef.current) load({ silent: true }); };
+    const onVisibility = () => { if (document.visibilityState === "visible" && !savingRef.current) load({ silent: true }); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load]);
 
   const setData = useCallback(async (next) => {
     setDataState(next);
     setSaving(true);
+    savingRef.current = true;
     try {
       await persistData(next);
       setError(null);
@@ -117,6 +145,7 @@ export function useAppData() {
       setError("Couldn't save — your last change may not have synced.");
     } finally {
       setSaving(false);
+      savingRef.current = false;
     }
   }, []);
 
