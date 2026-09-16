@@ -39,7 +39,9 @@ export default function App() {
   // Owned here (not inside LogTimeTab) so the live timer and its pop-out
   // window keep running/updating no matter which tab is showing — LogTimeTab
   // unmounts on every tab switch, which used to kill the timer's state.
-  const timer = useLiveTimer(data || EMPTY_DATA, setData, currentUser || PENDING_USER);
+  // isReady tells the hook once it's looking at the real logged-in user's
+  // data rather than the loading-phase placeholder.
+  const timer = useLiveTimer(data || EMPTY_DATA, setData, currentUser || PENDING_USER, !!(data && currentUser));
 
   if (loading || !data) {
     return <div style={{ padding: 60, textAlign: "center", color: "var(--ink-3)" }}>Loading…</div>;

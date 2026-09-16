@@ -67,7 +67,7 @@ const miniWidthFor = (label) => {
 // mounted regardless of which tab is active) rather than from LogTimeTab
 // itself — LogTimeTab unmounts on every tab switch, which used to kill the
 // timer's state and leave the pop-out window blank with nothing feeding it.
-export function useLiveTimer(data, setData, currentUser) {
+export function useLiveTimer(data, setData, currentUser, isReady) {
   const [clientId, setClientId] = useState(data.clients[0]?.id || "");
   const [taskId, setTaskId] = useState("");
   const [notes, setNotes] = useState("");
@@ -92,9 +92,15 @@ export function useLiveTimer(data, setData, currentUser) {
     if (client && !tasks.length) setTaskId("");
   }, [clientId, data.clients]);
 
-  // resume a timer that was left running (e.g. browser closed mid-shift)
+  // Resume a timer left running elsewhere — another tab, another device,
+  // closing the browser mid-shift. This has to wait for the real logged-in
+  // user's data, not the placeholder used while still loading: the hook is
+  // called unconditionally from App.jsx (hooks can't be conditional), so on
+  // first mount it briefly runs against stub/pending data. Marking the
+  // resume as "done" during that stub pass meant it never looked again once
+  // the real data — and the real running timer — actually arrived.
   useEffect(() => {
-    if (resumedRef.current) return;
+    if (resumedRef.current || !isReady) return;
     const t = data.timers[currentUser.id];
     if (t) {
       setTimerStart(t.startedAt);
@@ -104,7 +110,7 @@ export function useLiveTimer(data, setData, currentUser) {
       setBillable(t.billable !== false);
     }
     resumedRef.current = true;
-  }, [data.timers, currentUser.id]);
+  }, [data.timers, currentUser.id, isReady]);
 
   useEffect(() => {
     if (!timerStart) return;
@@ -119,31 +125,42 @@ export function useLiveTimer(data, setData, currentUser) {
     return list[0]?.id || "";
   };
 
-  // switching the company or activity while the timer is running saves the
-  // segment just worked (e.g. 3 min of Manage Inbox) and stops the timer —
-  // it never restarts on its own, only an explicit click of Start does that.
-  const applySelection = (nextClientId, nextTaskId) => {
-    if (timerStart) {
-      const now = Date.now();
-      const hrs = (now - timerStart) / 3600000;
-      let nextEntries = data.timeEntries;
-      if (hrs > MIN_ENTRY_HOURS) {
-        nextEntries = [...data.timeEntries, {
-          id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
-          notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
-          start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
-        }];
-      }
-      const nextTimers = { ...data.timers };
-      delete nextTimers[currentUser.id];
-      setData({ ...data, timeEntries: nextEntries, timers: nextTimers });
-      setTimerStart(null);
-      setElapsed(0);
-      setNotes("");
-      if (pipWindow && pipMode === "mini") pipWindow.close();
+  // Saves the segment worked so far as an entry and stops the timer —
+  // shared by anything that counts as "changing the timer" while it's
+  // running (company, activity, billable). It never restarts on its own;
+  // only an explicit click of Start does that.
+  const stopRunningSegment = () => {
+    if (!timerStart) return;
+    const now = Date.now();
+    const hrs = (now - timerStart) / 3600000;
+    let nextEntries = data.timeEntries;
+    if (hrs > MIN_ENTRY_HOURS) {
+      nextEntries = [...data.timeEntries, {
+        id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
+        notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
+        start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
+      }];
     }
+    const nextTimers = { ...data.timers };
+    delete nextTimers[currentUser.id];
+    setData({ ...data, timeEntries: nextEntries, timers: nextTimers });
+    setTimerStart(null);
+    setElapsed(0);
+    setNotes("");
+    if (pipWindow && pipMode === "mini") pipWindow.close();
+  };
+
+  const applySelection = (nextClientId, nextTaskId) => {
+    stopRunningSegment();
     setClientId(nextClientId);
     setTaskId(nextTaskId);
+  };
+
+  // Notes is exempt — it's typed character by character, so stopping the
+  // timer on every keystroke would make it unusable.
+  const toggleBillable = (nextBillable) => {
+    stopRunningSegment();
+    setBillable(nextBillable);
   };
 
   const addEntry = (hours, dateStr, extra = {}) => {
@@ -192,26 +209,7 @@ export function useLiveTimer(data, setData, currentUser) {
     setData({ ...data, timers: { ...data.timers, [currentUser.id]: { startedAt, clientId, taskId, notes, billable } } });
   };
 
-  const stopTimer = () => {
-    const now = Date.now();
-    const hrs = elapsed / 3600;
-    const nextTimers = { ...data.timers };
-    delete nextTimers[currentUser.id];
-    if (hrs > MIN_ENTRY_HOURS) {
-      const entry = {
-        id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
-        notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
-        start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
-      };
-      setData({ ...data, timeEntries: [...data.timeEntries, entry], timers: nextTimers });
-    } else {
-      setData({ ...data, timers: nextTimers });
-    }
-    setTimerStart(null);
-    setElapsed(0);
-    setNotes("");
-    if (pipWindow && pipMode === "mini") pipWindow.close();
-  };
+  const stopTimer = stopRunningSegment;
 
   // shared between the main "Live timer" card and the "full controls"
   // pop-out window, so both stay in sync — they're bound to the same state
@@ -236,7 +234,7 @@ export function useLiveTimer(data, setData, currentUser) {
           </p>
         )}
         <TextInput placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={compact ? { padding: "5px 9px" } : undefined} />
-        <Toggle checked={billable} onChange={setBillable} label="Billable" />
+        <Toggle checked={billable} onChange={toggleBillable} label="Billable" />
       </div>
       {!timerStart ? (
         <Button variant="accent" onClick={startTimer} style={{ width: "100%", justifyContent: "center", padding: compact ? "8px 14px" : "11px 14px" }}>
@@ -247,7 +245,7 @@ export function useLiveTimer(data, setData, currentUser) {
           <Square size={13} /> Stop & save
         </Button>
       )}
-      {timerStart && !compact && <p style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 10, textAlign: "center" }}>Running — changing the company or activity above saves what you just logged and stops the timer; click Start again to begin the next one. Safe to refresh too.</p>}
+      {timerStart && !compact && <p style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 10, textAlign: "center" }}>Running — changing the company, activity, or billable status above saves what you just logged and stops the timer; click Start again to begin the next one. Notes can still be edited freely. Safe to refresh too.</p>}
     </>
   );
 
@@ -284,7 +282,7 @@ export function useLiveTimer(data, setData, currentUser) {
   );
 
   return {
-    clientId, taskId, notes, setNotes, billable, setBillable,
+    clientId, taskId, notes, setNotes, billable, setBillable: toggleBillable,
     client, tasks, activeTask,
     timerStart, elapsed,
     computeDefaultTask, applySelection, addEntry, startTimer, stopTimer,
