@@ -77,7 +77,12 @@ export function useLiveTimer(data, setData, currentUser, isReady) {
   const [elapsed, setElapsed] = useState(0);
   const [pipWindow, setPipWindow] = useState(null);
   const [pipMode, setPipMode] = useState("mini"); // "mini" (read-only + stop) or "full" (all controls)
-  const resumedRef = useRef(false);
+  // Which employee's timer is currently loaded into the state above — not
+  // just "have we resumed once", since that only fired once per browser
+  // session, not once per account. Without this, switching accounts left
+  // whichever employee's timer was loaded first still showing, no matter
+  // who logged in after them.
+  const syncedUserIdRef = useRef(null);
 
   const client = data.clients.find((c) => c.id === clientId);
   const tasks = client ? data.taskTypes.filter((t) => (client.taskIds || []).includes(t.id)) : [];
@@ -92,15 +97,19 @@ export function useLiveTimer(data, setData, currentUser, isReady) {
     if (client && !tasks.length) setTaskId("");
   }, [clientId, data.clients]);
 
-  // Resume a timer left running elsewhere — another tab, another device,
-  // closing the browser mid-shift. This has to wait for the real logged-in
-  // user's data, not the placeholder used while still loading: the hook is
+  // Loads whichever timer belongs to the currently logged-in employee —
+  // resuming one left running (another tab, another device, closing the
+  // browser mid-shift) or clearing back to a blank state if they don't have
+  // one. Runs once per account, not once per browser session: it has to
+  // re-run every time currentUser.id changes (switching accounts on the
+  // shared login screen), or the previous account's timer state just stays
+  // on screen under the new account's name. Also waits for real logged-in
+  // data rather than the placeholder used while still loading — the hook is
   // called unconditionally from App.jsx (hooks can't be conditional), so on
-  // first mount it briefly runs against stub/pending data. Marking the
-  // resume as "done" during that stub pass meant it never looked again once
-  // the real data — and the real running timer — actually arrived.
+  // first mount it briefly runs against stub/pending data.
   useEffect(() => {
-    if (resumedRef.current || !isReady) return;
+    if (!isReady || syncedUserIdRef.current === currentUser.id) return;
+    const switchingAccounts = syncedUserIdRef.current !== null;
     const t = data.timers[currentUser.id];
     if (t) {
       setTimerStart(t.startedAt);
@@ -108,8 +117,18 @@ export function useLiveTimer(data, setData, currentUser, isReady) {
       setTaskId(t.taskId || "");
       setNotes(t.notes || "");
       setBillable(t.billable !== false);
+    } else {
+      setTimerStart(null);
+      setElapsed(0);
+      setClientId(data.clients[0]?.id || "");
+      setTaskId("");
+      setNotes("");
+      setBillable(true);
     }
-    resumedRef.current = true;
+    // A pop-out window left open is tied to whichever account was showing
+    // before — it'd otherwise keep displaying that account's stale timer.
+    if (switchingAccounts && pipWindow) pipWindow.close();
+    syncedUserIdRef.current = currentUser.id;
   }, [data.timers, currentUser.id, isReady]);
 
   useEffect(() => {
