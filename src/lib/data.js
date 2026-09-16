@@ -83,6 +83,52 @@ async function persistData(data) {
   return res.json();
 }
 
+// Every collection in the document is an array of {id,...} objects, so
+// concurrent edits from separate tabs can be reconciled generically: start
+// from the server's current copy (theirs), drop anything this tab deleted
+// (present in base, missing from mine), let this tab's version of an item
+// win when it touched one (present in mine), and otherwise keep whatever
+// the server has — which preserves entries someone else saved in the
+// meantime that this tab never knew about.
+function mergeArrayById(base, mine, theirs) {
+  base = base || []; mine = mine || []; theirs = theirs || [];
+  const baseIds = new Set(base.map((x) => x.id));
+  const mineIds = new Set(mine.map((x) => x.id));
+  const mineById = new Map(mine.map((x) => [x.id, x]));
+  const result = [];
+  const placed = new Set();
+  theirs.forEach((item) => {
+    if (baseIds.has(item.id) && !mineIds.has(item.id)) return; // deleted locally
+    result.push(mineById.has(item.id) ? mineById.get(item.id) : item);
+    placed.add(item.id);
+  });
+  mine.forEach((item) => { if (!placed.has(item.id)) result.push(item); }); // added locally, server doesn't have it yet
+  return result;
+}
+
+// Same idea as mergeArrayById but for the plain-object maps (timers keyed
+// by employeeId, timesheets keyed by "employeeId_weekStart", etc).
+function mergeMapByKey(base, mine, theirs) {
+  base = base || {}; mine = mine || {}; theirs = theirs || {};
+  const result = {};
+  Object.keys(theirs).forEach((key) => {
+    if (Object.hasOwn(base, key) && !Object.hasOwn(mine, key)) return; // deleted locally
+    result[key] = Object.hasOwn(mine, key) ? mine[key] : theirs[key];
+  });
+  Object.keys(mine).forEach((key) => { if (!Object.hasOwn(result, key)) result[key] = mine[key]; });
+  return result;
+}
+
+const ARRAY_KEYS = ["employees", "clients", "projects", "taskTypes", "engagements", "timeEntries", "directory", "auditLog"];
+const MAP_KEYS = ["timers", "timesheets", "passwordResets"];
+
+function mergeData(base, mine, theirs) {
+  const merged = { ...theirs };
+  ARRAY_KEYS.forEach((k) => { merged[k] = mergeArrayById(base[k], mine[k], theirs[k]); });
+  MAP_KEYS.forEach((k) => { merged[k] = mergeMapByKey(base[k], mine[k], theirs[k]); });
+  return merged;
+}
+
 // Same shape as the artifact version's useAppData hook, but backed by the
 // Express API instead of window.storage.
 export function useAppData() {
@@ -92,25 +138,31 @@ export function useAppData() {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const fetchingRef = useRef(false);
+  const dataRef = useRef(null);
+
+  const applyDataState = useCallback((next) => {
+    dataRef.current = next;
+    setDataState(next);
+  }, []);
 
   const load = useCallback(async ({ silent } = {}) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
       const raw = await fetchData();
-      setDataState(migrateData(raw));
+      applyDataState(migrateData(raw));
       if (!silent) setError(null);
     } catch (e) {
       console.error(e);
       if (!silent) {
         setError("Couldn't reach the server — is it running? (npm run dev)");
-        setDataState((d) => d ?? DEFAULT_DATA);
+        if (!dataRef.current) applyDataState(DEFAULT_DATA);
       }
     } finally {
       fetchingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [applyDataState]);
 
   useEffect(() => {
     load();
@@ -133,12 +185,27 @@ export function useAppData() {
     };
   }, [load]);
 
+  // setData used to PUT the caller's `next` object as-is, which is a whole-
+  // document overwrite: if another tab saved something in between this
+  // tab's last fetch and now, that save gets silently wiped out. Instead,
+  // refetch the server's current copy right before writing and merge this
+  // tab's change onto it (see mergeData), so two tabs saving close together
+  // both survive instead of last-write-wins clobbering the other.
   const setData = useCallback(async (next) => {
-    setDataState(next);
+    const base = dataRef.current || DEFAULT_DATA;
+    applyDataState(next);
     setSaving(true);
     savingRef.current = true;
+    let toPersist = next;
     try {
-      await persistData(next);
+      const theirs = migrateData(await fetchData());
+      toPersist = mergeData(base, next, theirs);
+      applyDataState(toPersist);
+    } catch (e) {
+      console.error("refetch-before-save failed, saving local copy instead", e);
+    }
+    try {
+      await persistData(toPersist);
       setError(null);
     } catch (e) {
       console.error(e);
@@ -147,7 +214,7 @@ export function useAppData() {
       setSaving(false);
       savingRef.current = false;
     }
-  }, []);
+  }, [applyDataState]);
 
   return { data, setData, loading, saving, error };
 }
