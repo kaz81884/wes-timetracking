@@ -27,7 +27,7 @@ export default async (request) => {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
-  const store = getStore("wes-timetrack");
+  const store = getStore("wes-timetrack", { consistency: "strong" });
   const data = (await store.get("data", { type: "json" })) || DEFAULT_DATA;
   const { email, origin } = body;
   const employee = (data.employees || []).find((e) => e.email && e.email.toLowerCase() === String(email || "").trim().toLowerCase());

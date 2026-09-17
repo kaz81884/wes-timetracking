@@ -20,7 +20,7 @@ const DEFAULT_DATA = {
 // getStore() auto-picks up the site/deploy context when running on Netlify,
 // no extra setup or environment variables needed.
 export default async (request) => {
-  const store = getStore("wes-timetrack");
+  const store = getStore("wes-timetrack", { consistency: "strong" });
 
   if (request.method === "GET") {
     const data = await store.get("data", { type: "json" });
