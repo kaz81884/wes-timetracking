@@ -19,7 +19,7 @@ const EMPTY_DATA = { clients: [], taskTypes: [], timeEntries: [], timers: {} };
 const PENDING_USER = { id: "__pending__" };
 
 export default function App() {
-  const { data, setData, loading, saving, error } = useAppData();
+  const { data, setData, timerOp, loading, saving, error } = useAppData();
   const [userId, setUserId] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get("reset"));
@@ -41,7 +41,7 @@ export default function App() {
   // unmounts on every tab switch, which used to kill the timer's state.
   // isReady tells the hook once it's looking at the real logged-in user's
   // data rather than the loading-phase placeholder.
-  const timer = useLiveTimer(data || EMPTY_DATA, setData, currentUser || PENDING_USER, !!(data && currentUser));
+  const timer = useLiveTimer(data || EMPTY_DATA, setData, timerOp, currentUser || PENDING_USER, !!(data && currentUser));
 
   if (loading || !data) {
     return <div style={{ padding: 60, textAlign: "center", color: "var(--ink-3)" }}>Loading…</div>;

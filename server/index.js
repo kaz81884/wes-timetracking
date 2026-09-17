@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { sendResetEmail, makeResetToken, RESET_TOKEN_TTL_MS } from "../shared/sendResetEmail.mjs";
+import { applyTimerOp } from "../shared/timerOps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.join(__dirname, "data.json");
@@ -57,6 +58,20 @@ app.put("/api/data", (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to save" });
+  }
+});
+
+// Dedicated start/stop endpoint for the live timer — see shared/timerOps.mjs
+// for why this reads, mutates, and writes back in one request instead of
+// going through the generic GET/PUT /api/data round trip.
+app.post("/api/timer", (req, res) => {
+  try {
+    const next = applyTimerOp(readData(), req.body);
+    writeData(next);
+    res.json(next);
+  } catch (e) {
+    console.error(e);
+    res.status(400).json({ error: e.message });
   }
 });
 

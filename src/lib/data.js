@@ -83,6 +83,16 @@ async function persistData(data) {
   return res.json();
 }
 
+async function postTimerOp(body) {
+  const res = await fetch("/api/timer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`POST /api/timer failed: ${res.status}`);
+  return res.json();
+}
+
 // Every collection in the document is an array of {id,...} objects, so
 // concurrent edits from separate tabs can be reconciled generically: start
 // from the server's current copy (theirs), drop anything this tab deleted
@@ -185,41 +195,31 @@ export function useAppData() {
     };
   }, [load]);
 
-  // setData used to PUT the caller's `next` object as-is, which is a whole-
-  // document overwrite: if another tab saved something in between this
-  // tab's last fetch and now, that save gets silently wiped out. Instead,
-  // refetch the server's current copy right before writing and merge this
-  // tab's change onto it (see mergeData), so two tabs saving close together
-  // both survive instead of last-write-wins clobbering the other.
+  // setData PUTs the caller's `next` object, which is a whole-document
+  // overwrite: if another tab saved something in between this tab's last
+  // fetch and now, that save gets silently wiped out. Instead, refetch the
+  // server's current copy right before writing and merge this tab's change
+  // onto it (see mergeData), so two tabs saving close together both survive
+  // instead of last-write-wins clobbering the other.
   //
-  // The base/mine/theirs merge still has one race: if `next` was computed
-  // from local state that's briefly stale (someone else's save landing in
-  // the gap between this tab's last known state and now), that staleness
-  // gets read as "someone else has this and I don't know differently" and
-  // gets carried forward — e.g. person A stops a timer, and if person B's
-  // save's own refetch lands in the split second before A's write finishes,
-  // B's save (touching a totally different key) unwittingly resurrects A's
-  // just-stopped timer. `next` can be a function `(freshData) => nextData`
-  // instead of a plain object to sidestep this: it's applied directly onto
-  // the just-fetched server copy rather than reconciled against a locally
-  // computed snapshot, so it can only ever affect the keys it actually
-  // touches. Used by the live timer's start/stop, where this race matters.
+  // This merge still has one race, though: it's a client-side read (fetch
+  // "theirs"), compute, write — and if that fetch happens to land in the
+  // split second before someone ELSE's own read-compute-write finishes,
+  // it'll see their in-flight change as "already committed" and carry it
+  // forward, even reintroducing something they just deleted. That's exactly
+  // what happened with the live timer (frequent start/stop, one entry per
+  // employee) so its start/stop go through the dedicated timerOp below
+  // instead, which does the whole read-modify-write in a single server
+  // request — no client round trip in the middle left to race.
   const setData = useCallback(async (next) => {
-    const isUpdater = typeof next === "function";
     const base = dataRef.current || DEFAULT_DATA;
-    // Apply immediately against local state so anything reading `data`
-    // synchronously right after this call (e.g. switching accounts and
-    // back, which resumes a timer straight from data.timers) sees the
-    // change without waiting on a network round trip. For the updater
-    // form this is a best-effort local computation — it gets superseded
-    // below once the fresh fetch lands and the race-safe version applies.
-    let toPersist = isUpdater ? next(base) : next;
-    applyDataState(toPersist);
+    applyDataState(next);
     setSaving(true);
     savingRef.current = true;
+    let toPersist = next;
     try {
       const theirs = migrateData(await fetchData());
-      toPersist = isUpdater ? next(theirs) : mergeData(base, next, theirs);
+      toPersist = mergeData(base, next, theirs);
       applyDataState(toPersist);
     } catch (e) {
       console.error("refetch-before-save failed, saving local copy instead", e);
@@ -236,5 +236,29 @@ export function useAppData() {
     }
   }, [applyDataState]);
 
-  return { data, setData, loading, saving, error };
+  // Dedicated start/stop path for the live timer (see comment on setData
+  // above for why). `optimisticNext` is a best-effort local guess applied
+  // immediately so anything reading `data` right after this call — like
+  // switching accounts and back, which resumes a timer straight from
+  // data.timers — doesn't see stale state during the round trip; the
+  // server's response (the actual source of truth) supersedes it once it
+  // lands.
+  const timerOp = useCallback(async (body, optimisticNext) => {
+    if (optimisticNext) applyDataState(optimisticNext);
+    setSaving(true);
+    savingRef.current = true;
+    try {
+      const next = migrateData(await postTimerOp(body));
+      applyDataState(next);
+      setError(null);
+    } catch (e) {
+      console.error(e);
+      setError("Couldn't save — your last change may not have synced.");
+    } finally {
+      setSaving(false);
+      savingRef.current = false;
+    }
+  }, [applyDataState]);
+
+  return { data, setData, timerOp, loading, saving, error };
 }
