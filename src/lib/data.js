@@ -207,17 +207,22 @@ export function useAppData() {
   const setData = useCallback(async (next) => {
     const isUpdater = typeof next === "function";
     const base = dataRef.current || DEFAULT_DATA;
-    if (!isUpdater) applyDataState(next);
+    // Apply immediately against local state so anything reading `data`
+    // synchronously right after this call (e.g. switching accounts and
+    // back, which resumes a timer straight from data.timers) sees the
+    // change without waiting on a network round trip. For the updater
+    // form this is a best-effort local computation — it gets superseded
+    // below once the fresh fetch lands and the race-safe version applies.
+    let toPersist = isUpdater ? next(base) : next;
+    applyDataState(toPersist);
     setSaving(true);
     savingRef.current = true;
-    let toPersist = isUpdater ? null : next;
     try {
       const theirs = migrateData(await fetchData());
       toPersist = isUpdater ? next(theirs) : mergeData(base, next, theirs);
       applyDataState(toPersist);
     } catch (e) {
       console.error("refetch-before-save failed, saving local copy instead", e);
-      if (isUpdater) { toPersist = next(base); applyDataState(toPersist); }
     }
     try {
       await persistData(toPersist);
