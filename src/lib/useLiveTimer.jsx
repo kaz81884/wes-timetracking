@@ -148,21 +148,26 @@ export function useLiveTimer(data, setData, currentUser, isReady) {
   // shared by anything that counts as "changing the timer" while it's
   // running (company, activity, billable). It never restarts on its own;
   // only an explicit click of Start does that.
+  //
+  // Uses setData's updater form (patches the freshest server copy directly)
+  // rather than computing the next object from local state: with the plain
+  // form, if another employee's save raced this one, their unrelated save
+  // could read this timer as "still running" (stale, but merge can't tell)
+  // and write it back — resurrecting a timer that was just stopped here.
   const stopRunningSegment = () => {
     if (!timerStart) return;
     const now = Date.now();
     const hrs = (now - timerStart) / 3600000;
-    let nextEntries = data.timeEntries;
-    if (hrs > MIN_ENTRY_HOURS) {
-      nextEntries = [...data.timeEntries, {
-        id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
-        notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
-        start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
-      }];
-    }
-    const nextTimers = { ...data.timers };
-    delete nextTimers[currentUser.id];
-    setData({ ...data, timeEntries: nextEntries, timers: nextTimers });
+    const entry = hrs > MIN_ENTRY_HOURS ? {
+      id: uid(), employeeId: currentUser.id, clientId: clientId || null, taskId: taskId || null,
+      notes, hours: Math.round(hrs * 3600) / 3600, date: todayStr(), billable, mode: "range",
+      start: fmtTimeHMS(new Date(timerStart)), end: fmtTimeHMS(new Date(now)),
+    } : null;
+    setData((current) => {
+      const nextTimers = { ...current.timers };
+      delete nextTimers[currentUser.id];
+      return { ...current, timeEntries: entry ? [...current.timeEntries, entry] : current.timeEntries, timers: nextTimers };
+    });
     setTimerStart(null);
     setElapsed(0);
     setNotes("");
@@ -225,7 +230,7 @@ export function useLiveTimer(data, setData, currentUser, isReady) {
   const startTimer = () => {
     const startedAt = Date.now();
     setTimerStart(startedAt);
-    setData({ ...data, timers: { ...data.timers, [currentUser.id]: { startedAt, clientId, taskId, notes, billable } } });
+    setData((current) => ({ ...current, timers: { ...current.timers, [currentUser.id]: { startedAt, clientId, taskId, notes, billable } } }));
   };
 
   const stopTimer = stopRunningSegment;

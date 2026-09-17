@@ -191,18 +191,33 @@ export function useAppData() {
   // refetch the server's current copy right before writing and merge this
   // tab's change onto it (see mergeData), so two tabs saving close together
   // both survive instead of last-write-wins clobbering the other.
+  //
+  // The base/mine/theirs merge still has one race: if `next` was computed
+  // from local state that's briefly stale (someone else's save landing in
+  // the gap between this tab's last known state and now), that staleness
+  // gets read as "someone else has this and I don't know differently" and
+  // gets carried forward — e.g. person A stops a timer, and if person B's
+  // save's own refetch lands in the split second before A's write finishes,
+  // B's save (touching a totally different key) unwittingly resurrects A's
+  // just-stopped timer. `next` can be a function `(freshData) => nextData`
+  // instead of a plain object to sidestep this: it's applied directly onto
+  // the just-fetched server copy rather than reconciled against a locally
+  // computed snapshot, so it can only ever affect the keys it actually
+  // touches. Used by the live timer's start/stop, where this race matters.
   const setData = useCallback(async (next) => {
+    const isUpdater = typeof next === "function";
     const base = dataRef.current || DEFAULT_DATA;
-    applyDataState(next);
+    if (!isUpdater) applyDataState(next);
     setSaving(true);
     savingRef.current = true;
-    let toPersist = next;
+    let toPersist = isUpdater ? null : next;
     try {
       const theirs = migrateData(await fetchData());
-      toPersist = mergeData(base, next, theirs);
+      toPersist = isUpdater ? next(theirs) : mergeData(base, next, theirs);
       applyDataState(toPersist);
     } catch (e) {
       console.error("refetch-before-save failed, saving local copy instead", e);
+      if (isUpdater) { toPersist = next(base); applyDataState(toPersist); }
     }
     try {
       await persistData(toPersist);
